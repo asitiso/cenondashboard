@@ -135,8 +135,8 @@ export function getDetailSections(item: DashboardItem): DetailSection[] {
   if (item.kind === "manual") {
     return [
       detailSection("현재 문제", [{ label: "현재 문제", value: pickText(item.raw, ["currentProblem"]) }]),
-      detailSection("확인된 사실", [{ label: "확인된 사실", value: pickText(item.raw, ["confirmedFact"]) }]),
-      detailSection("개선 제안", [{ label: "개선 제안", value: pickText(item.raw, ["proposal", "description", "reason", "memo"]) }], "highlight"),
+      detailSection("확인된 사실", [{ label: "확인된 사실", value: pickText(item.raw, ["confirmedFact"]) }], "highlight"),
+      detailSection("요약", [{ label: "요약", value: pickText(item.raw, ["proposal", "description", "reason", "memo"]) }]),
       detailSection("관리 정보", [
         item.updatedAt ? { label: "최근 수정", value: formatKoreanDate(item.updatedAt) } : undefined,
         { label: "요청자", value: item.owner }

@@ -163,7 +163,7 @@ describe("dense row display helpers", () => {
     expect(sections.flatMap((section) => section.rows).some((row) => row.value.includes("topics/"))).toBe(false);
   });
 
-  it("keeps manual details in problem, fact, proposal order while highlighting the proposal", () => {
+  it("keeps manual details in problem, highlighted fact, and summary order", () => {
     const item = normalizeManualImprove("manual-1", {
       title: "일반약 주문 시간",
       currentProblem: "주문 마감시간이 매뉴얼에 없다.",
@@ -173,8 +173,9 @@ describe("dense row display helpers", () => {
 
     const sections = getDetailSections(item);
 
-    expect(sections.map((section) => section.title)).toEqual(["현재 문제", "확인된 사실", "개선 제안", "관리 정보"]);
-    expect(sections[2]).toMatchObject({ title: "개선 제안", tone: "highlight" });
+    expect(sections.map((section) => section.title)).toEqual(["현재 문제", "확인된 사실", "요약", "관리 정보"]);
+    expect(sections[1]).toMatchObject({ title: "확인된 사실", tone: "highlight" });
+    expect(sections[2]).toMatchObject({ title: "요약", tone: undefined });
     expect(sections[2].rows[0].value).toBe("주문 매뉴얼에 전송 시간을 추가한다.");
   });
 

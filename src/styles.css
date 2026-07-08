@@ -1079,13 +1079,16 @@ h2 {
 
 .detail-section-list.manual-flow .detail-section.highlight {
   margin-top: 2px;
-  padding: 14px 0;
-  border-color: #cfe4d9;
-  background: transparent;
+  padding: 14px 14px 14px 16px;
+  border-top: 1px solid #b7dccc;
+  border-left: 4px solid var(--green-800);
+  border-radius: 8px;
+  background: #eef7f2;
 }
 
 .detail-section-list.manual-flow .detail-section.highlight h3 {
-  font-size: 15px;
+  color: var(--green-900);
+  font-size: 16px;
 }
 
 .detail-section-list.manual-flow .detail-section.highlight dd {
