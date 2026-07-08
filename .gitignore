@@ -5,3 +5,5 @@ work/
 outputs/
 .codex-remote-attachments/
 .DS_Store
+
+.vercel
