@@ -1,5 +1,9 @@
 import type { DashboardItem } from "../types";
 
+function latestActivityTime(item: DashboardItem): number {
+  return item.updatedAt?.getTime() ?? item.createdAt?.getTime() ?? 0;
+}
+
 export function sortForAction(items: DashboardItem[]): DashboardItem[] {
   const urgencyScore = { critical: 0, high: 1, normal: 2, low: 3 };
   return [...items].sort((a, b) => {
@@ -14,4 +18,8 @@ export function sortForAction(items: DashboardItem[]): DashboardItem[] {
     if (urgent !== 0) return urgent;
     return (a.dueAt?.getTime() ?? Number.MAX_SAFE_INTEGER) - (b.dueAt?.getTime() ?? Number.MAX_SAFE_INTEGER);
   });
+}
+
+export function sortChangesLatestFirst(items: DashboardItem[]): DashboardItem[] {
+  return [...items].sort((a, b) => latestActivityTime(b) - latestActivityTime(a));
 }

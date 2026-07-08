@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, type DocumentData, type QuerySnapshot } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import type { DashboardItem } from "../types";
-import { getFirebaseServices, isFirebaseConfigured, loginWithEmail, logout, subscribeAuth } from "../lib/firebase";
+import { getFirebaseServices, isFirebaseConfigured, loginWithEmail, logout, subscribeAuth, toggleDrugPriority } from "../lib/firebase";
 import { mockItems } from "../lib/mockData";
 import { normalizeDrug, normalizeManualImprove, normalizeTopic } from "../lib/normalize";
 
@@ -14,6 +14,7 @@ interface DashboardDataState {
   errors: string[];
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  toggleDrugPriority: (item: DashboardItem) => Promise<void>;
 }
 
 function docsFromSnapshot(snapshot: QuerySnapshot<DocumentData>): Array<[string, Record<string, unknown>]> {
@@ -91,6 +92,7 @@ export function useDashboardData(): DashboardDataState {
     mockMode: !isFirebaseConfigured,
     errors,
     login: loginWithEmail,
-    logout
+    logout,
+    toggleDrugPriority: (item) => toggleDrugPriority(item.source.path, !item.isPriority)
   };
 }

@@ -33,7 +33,7 @@ function buildSearchTokens(item: DashboardItem): string[] {
     item.owner,
     kindLabel[item.kind],
     visibleStatus,
-    item.isPriority ? "우선" : "",
+    item.isPriority ? "먼저" : "",
     item.dueAt ? formatKoreanDate(item.dueAt) : "",
     getRemainingDaysLabel(item) ?? "",
     ...item.tags,

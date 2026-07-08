@@ -16,22 +16,30 @@ import {
   X
 } from "lucide-react";
 import { useDashboardData } from "./hooks/useDashboardData";
-import type { DashboardItem, DrugCategory, ItemKind, ItemStatus } from "./types";
+import type { ChangeCategory, DashboardItem, DrugCategory, ItemKind, ItemStatus } from "./types";
 import { buildHomeSections, type HomeDrugFilter } from "./lib/homeSections";
 import { buildHomeSummary } from "./lib/summary";
-import { sortForAction } from "./lib/sort";
+import { sortChangesLatestFirst, sortForAction } from "./lib/sort";
 import { matchesItemSearch } from "./lib/search";
+import { DEFAULT_SIDEBAR_COLLAPSED } from "./lib/layout";
+import { CHANGE_CATEGORIES, getChangeCategory, groupChangesByCategory, type ChangeCategoryGroup } from "./lib/changeCategories";
+import { shouldShowChangeInList } from "./lib/changeStatus";
+import { getDrugStatusLabel, type DrugStatusLabel } from "./lib/drugStatus";
 import {
   formatKoreanDate,
   getDenseRowMeta,
   getDenseRowTimeLabel,
   getDetailDescription,
   getDetailRows,
-  getDrugListFacts
+  getDrugListFacts,
+  shouldShowDenseStatusBadge,
+  shouldShowStatusBadge
 } from "./lib/display";
 
 type ViewKey = "home" | "changes" | "manual" | "drugs" | "search";
 type DrugTab = "all" | DrugCategory;
+type DrugStatusFilter = "all" | DrugStatusLabel;
+type ChangeListMode = "latest" | "category";
 
 const statusLabel: Record<ItemStatus, string> = {
   new: "신규",
@@ -146,33 +154,66 @@ function DenseItemRow({ item, onSelect }: { item: DashboardItem; onSelect: (item
     <button className={`dense-row ${item.kind === "drug" ? "drug-row" : ""}`} onClick={() => onSelect(item)}>
       <span className={`urgency-dot ${item.urgency}`} />
       <strong>{item.title}</strong>
-      {item.isPriority && <span className="priority-badge">우선</span>}
-      <StatusBadge item={item} />
+      {item.isPriority && <span className="priority-badge">먼저</span>}
+      {shouldShowDenseStatusBadge(item) && <StatusBadge item={item} />}
       <span className="dense-meta">{getDenseRowMeta(item)}</span>
       <span className="dense-due">{getDenseRowTimeLabel(item)}</span>
     </button>
   );
 }
 
-function ItemRow({ item, active, onSelect }: { item: DashboardItem; active: boolean; onSelect: (item: DashboardItem) => void }) {
+function ItemRow({
+  item,
+  active,
+  onSelect,
+  onTogglePriority
+}: {
+  item: DashboardItem;
+  active: boolean;
+  onSelect: (item: DashboardItem) => void;
+  onTogglePriority?: (item: DashboardItem) => Promise<void>;
+}) {
   const drugFacts = getDrugListFacts(item);
 
   return (
-    <button className={`item-row ${item.kind === "drug" ? "drug-list-row" : ""} ${active ? "active" : ""}`} onClick={() => onSelect(item)}>
+    <div
+      className={`item-row ${item.kind === "drug" ? "drug-list-row" : ""} ${active ? "active" : ""}`}
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect(item)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") onSelect(item);
+      }}
+    >
       <div className="row-main">
         <div className="row-title">
           <span className={`urgency-dot ${item.urgency}`} />
           <strong>{item.title}</strong>
-          {item.kind !== "drug" && item.isPriority && <span className="priority-badge">우선</span>}
+          {item.kind !== "drug" && item.isPriority && <span className="priority-badge">먼저</span>}
           {item.kind !== "drug" && <StatusBadge item={item} />}
         </div>
         {item.kind === "drug" ? (
           <div className="drug-fact-strip">
             {drugFacts.map((fact) => (
-              <span className={`drug-fact ${fact.label === "우선" ? "priority" : ""}`} key={fact.label}>
-                {fact.label !== "우선" && fact.label !== "남은" && <small>{fact.label}</small>}
-                <strong>{fact.value}</strong>
-              </span>
+              fact.label === "먼저" ? (
+                <button
+                  className={`drug-fact first-toggle ${item.isPriority ? "priority selected" : ""}`}
+                  key={fact.label}
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void onTogglePriority?.(item);
+                  }}
+                  aria-pressed={Boolean(item.isPriority)}
+                >
+                  <strong>{fact.value}</strong>
+                </button>
+              ) : (
+                <span className={`drug-fact ${fact.label === "상태" ? `drug-status ${fact.value}` : ""}`} key={fact.label}>
+                  {fact.label !== "남은" && <small>{fact.label}</small>}
+                  <strong>{fact.value}</strong>
+                </span>
+              )
             ))}
           </div>
         ) : (
@@ -182,9 +223,9 @@ function ItemRow({ item, active, onSelect }: { item: DashboardItem; active: bool
       <div className="row-meta">
         <span>{kindLabel[item.kind]}</span>
         <span>{item.owner}</span>
-        {item.kind === "drug" ? <StatusBadge item={item} /> : <span>기한 {formatDate(item.dueAt)}</span>}
+        {item.kind !== "drug" && <span>기한 {formatDate(item.dueAt)}</span>}
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -208,7 +249,7 @@ function DetailPanel({ item }: { item?: DashboardItem }) {
           <p className="eyebrow">{kindLabel[item.kind]}</p>
           <h2>{item.title}</h2>
         </div>
-        <StatusBadge item={item} />
+        {shouldShowStatusBadge(item) && <StatusBadge item={item} />}
       </div>
       {detailDescription && <p className="detail-description">{detailDescription}</p>}
       <dl className="detail-list">
@@ -242,36 +283,77 @@ function FilterBar({
   status,
   setStatus,
   query,
-  setQuery
+  setQuery,
+  showStatusFilters = true,
+  placeholder = "제목, 위치, 상태 검색"
 }: {
   status: "all" | ItemStatus;
   setStatus: (status: "all" | ItemStatus) => void;
   query: string;
   setQuery: (query: string) => void;
+  showStatusFilters?: boolean;
+  placeholder?: string;
 }) {
   const statuses: Array<"all" | ItemStatus> = ["all", "review", "new", "inProgress", "overdue", "done"];
   return (
     <div className="filter-bar">
-      <div className="segmented">
-        {statuses.map((entry) => (
-          <button key={entry} className={status === entry ? "selected" : ""} onClick={() => setStatus(entry)}>
-            {entry === "all" ? "전체" : statusLabel[entry]}
-          </button>
-        ))}
-      </div>
+      {showStatusFilters && (
+        <div className="segmented">
+          {statuses.map((entry) => (
+            <button key={entry} className={status === entry ? "selected" : ""} onClick={() => setStatus(entry)}>
+              {entry === "all" ? "전체" : statusLabel[entry]}
+            </button>
+          ))}
+        </div>
+      )}
       <label className="search-box">
         <Search size={16} />
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="제목, 위치, 상태 검색" />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={placeholder} />
       </label>
     </div>
   );
 }
 
-function WorkList({ items, selected, onSelect }: { items: DashboardItem[]; selected?: DashboardItem; onSelect: (item: DashboardItem) => void }) {
+function WorkList({
+  items,
+  selected,
+  onSelect,
+  onTogglePriority
+}: {
+  items: DashboardItem[];
+  selected?: DashboardItem;
+  onSelect: (item: DashboardItem) => void;
+  onTogglePriority?: (item: DashboardItem) => Promise<void>;
+}) {
   if (items.length === 0) return <div className="empty-list">조건에 맞는 항목이 없습니다.</div>;
   return (
     <div className="work-list">
-      {items.map((item) => <ItemRow key={`${item.source.path}-${item.id}`} item={item} active={selected?.source.path === item.source.path} onSelect={onSelect} />)}
+      {items.map((item) => (
+        <ItemRow
+          key={`${item.source.path}-${item.id}`}
+          item={item}
+          active={selected?.source.path === item.source.path}
+          onSelect={onSelect}
+          onTogglePriority={onTogglePriority}
+        />
+      ))}
+    </div>
+  );
+}
+
+function GroupedWorkList({ groups, selected, onSelect }: { groups: ChangeCategoryGroup[]; selected?: DashboardItem; onSelect: (item: DashboardItem) => void }) {
+  if (groups.length === 0) return <div className="empty-list">조건에 맞는 항목이 없습니다.</div>;
+  return (
+    <div className="category-group-list">
+      {groups.map((group) => (
+        <section className="category-group" key={group.category}>
+          <header>
+            <strong>{group.category}</strong>
+            <span>{group.items.length}</span>
+          </header>
+          <WorkList items={group.items} selected={selected} onSelect={onSelect} />
+        </section>
+      ))}
     </div>
   );
 }
@@ -340,26 +422,40 @@ function ListView({
   items,
   selected,
   onSelect,
-  drugMode = false
+  onTogglePriority,
+  drugMode = false,
+  changeMode = false
 }: {
   title: string;
   eyebrow: string;
   items: DashboardItem[];
   selected?: DashboardItem;
   onSelect: (item: DashboardItem) => void;
+  onTogglePriority?: (item: DashboardItem) => Promise<void>;
   drugMode?: boolean;
+  changeMode?: boolean;
 }) {
   const [status, setStatus] = useState<"all" | ItemStatus>("all");
   const [query, setQuery] = useState("");
   const [drugTab, setDrugTab] = useState<DrugTab>("all");
+  const [drugStatus, setDrugStatus] = useState<DrugStatusFilter>("all");
+  const [changeListMode, setChangeListMode] = useState<ChangeListMode>("latest");
+  const [changeCategory, setChangeCategory] = useState<"all" | ChangeCategory>("all");
+  const [includeCompletedChanges, setIncludeCompletedChanges] = useState(false);
 
   const filtered = useMemo(() => {
-    return sortForAction(items).filter((item) => {
-      const statusMatch = status === "all" || item.status === status;
+    const sortedItems = changeMode ? sortChangesLatestFirst(items) : sortForAction(items);
+    return sortedItems.filter((item) => {
+      const statusMatch = drugMode || changeMode || status === "all" || item.status === status;
       const drugMatch = !drugMode || drugTab === "all" || item.category === drugTab;
-      return statusMatch && drugMatch && matchesItemSearch(item, query);
+      const drugStatusMatch = !drugMode || drugStatus === "all" || getDrugStatusLabel(item) === drugStatus;
+      const categoryMatch = !changeMode || changeListMode !== "category" || changeCategory === "all" || getChangeCategory(item) === changeCategory;
+      const changeStatusMatch = !changeMode || shouldShowChangeInList(item, includeCompletedChanges);
+      return statusMatch && drugMatch && drugStatusMatch && categoryMatch && changeStatusMatch && matchesItemSearch(item, query);
     });
-  }, [drugMode, drugTab, items, query, status]);
+  }, [changeCategory, changeListMode, changeMode, drugMode, drugStatus, drugTab, includeCompletedChanges, items, query, status]);
+
+  const changeGroups = useMemo(() => groupChangesByCategory(filtered), [filtered]);
 
   return (
     <section className="view">
@@ -380,18 +476,64 @@ function ListView({
           ))}
         </div>
       )}
-      <FilterBar status={status} setStatus={setStatus} query={query} setQuery={setQuery} />
-      <WorkList items={filtered} selected={selected} onSelect={onSelect} />
+      {drugMode && (
+        <div className="category-chips compact" aria-label="유기관리 상태">
+          {(["all", "긴급", "주의", "양호"] as DrugStatusFilter[]).map((entry) => (
+            <button key={entry} className={drugStatus === entry ? "selected" : ""} onClick={() => setDrugStatus(entry)}>
+              {entry === "all" ? "전체" : entry}
+            </button>
+          ))}
+        </div>
+      )}
+      {changeMode && (
+        <div className="tabs">
+          <button className={changeListMode === "latest" ? "selected" : ""} onClick={() => setChangeListMode("latest")}>최신순</button>
+          <button className={changeListMode === "category" ? "selected" : ""} onClick={() => setChangeListMode("category")}>카테고리별</button>
+        </div>
+      )}
+      {changeMode && changeListMode === "category" && (
+        <div className="category-chips" aria-label="변경사항 카테고리">
+          <button className={changeCategory === "all" ? "selected" : ""} onClick={() => setChangeCategory("all")}>전체</button>
+          {CHANGE_CATEGORIES.map((category) => (
+            <button key={category} className={changeCategory === category ? "selected" : ""} onClick={() => setChangeCategory(category)}>
+              {category}
+            </button>
+          ))}
+        </div>
+      )}
+      {changeMode && (
+        <label className="inline-toggle">
+          <input
+            type="checkbox"
+            checked={includeCompletedChanges}
+            onChange={(event) => setIncludeCompletedChanges(event.target.checked)}
+          />
+          <span>완료 포함</span>
+        </label>
+      )}
+      <FilterBar
+        status={status}
+        setStatus={setStatus}
+        query={query}
+        setQuery={setQuery}
+        showStatusFilters={!drugMode && !changeMode}
+        placeholder={drugMode ? "약명, 위치, 유효기간 검색" : changeMode ? "제목, 카테고리, 내용 검색" : "제목, 위치, 상태 검색"}
+      />
+      {changeMode && changeListMode === "category" ? (
+        <GroupedWorkList groups={changeGroups} selected={selected} onSelect={onSelect} />
+      ) : (
+        <WorkList items={filtered} selected={selected} onSelect={onSelect} onTogglePriority={onTogglePriority} />
+      )}
     </section>
   );
 }
 
 export default function App() {
-  const { items, user, loading, mockMode, errors, login, logout } = useDashboardData();
+  const { items, user, loading, mockMode, errors, login, logout, toggleDrugPriority } = useDashboardData();
   const [view, setView] = useState<ViewKey>("home");
   const [selected, setSelected] = useState<DashboardItem | undefined>();
   const [overlayOpen, setOverlayOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(DEFAULT_SIDEBAR_COLLAPSED);
 
   const viewItems = useMemo(() => ({
     changes: items.filter((item) => item.kind === "change"),
@@ -470,9 +612,9 @@ export default function App() {
           </>
         ) : (
           <div className="content-grid">
-            {view === "changes" && <ListView title="변경사항" eyebrow="현재 반영하거나 확인할 변경" items={viewItems.changes} selected={selected} onSelect={setSelected} />}
+            {view === "changes" && <ListView title="변경사항" eyebrow="현재 반영하거나 확인할 변경" items={viewItems.changes} selected={selected} onSelect={setSelected} changeMode />}
             {view === "manual" && <ListView title="매뉴얼 개선" eyebrow="검토 대기와 장기 미처리 확인" items={viewItems.manual} selected={selected} onSelect={setSelected} />}
-            {view === "drugs" && <ListView title="유기관리" eyebrow="전문약과 일반약을 함께 보되 원본 경로는 분리" items={viewItems.drugs} selected={selected} onSelect={setSelected} drugMode />}
+            {view === "drugs" && <ListView title="유기관리" eyebrow="전문약과 일반약을 함께 보되 원본 경로는 분리" items={viewItems.drugs} selected={selected} onSelect={setSelected} onTogglePriority={toggleDrugPriority} drugMode />}
             {view === "search" && <ListView title="통합 검색" eyebrow="네 컬렉션을 한 번에 검색" items={viewItems.search} selected={selected} onSelect={setSelected} />}
             <DetailPanel item={selected} />
           </div>

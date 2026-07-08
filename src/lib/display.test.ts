@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { normalizeDrug, normalizeManualImprove, normalizeTopic } from "./normalize";
-import { getDenseRowMeta, getDenseRowTimeLabel, getDetailDescription, getDetailRows, getDrugListFacts } from "./display";
+import { getDenseRowMeta, getDenseRowTimeLabel, getDetailDescription, getDetailRows, getDrugListFacts, shouldShowDenseStatusBadge, shouldShowStatusBadge } from "./display";
 
 describe("dense row display helpers", () => {
   it("shows drug location and quantity instead of owner on home rows", () => {
@@ -37,6 +37,7 @@ describe("dense row display helpers", () => {
   });
 
   it("builds drug detail rows around expiry, location, quantity, and source path", () => {
+    vi.setSystemTime(new Date("2026-07-08T00:00:00+09:00"));
     const item = normalizeDrug("drug-1", {
       name: "케프라액",
       exp: "2026-11-17",
@@ -48,13 +49,15 @@ describe("dense row display helpers", () => {
 
     expect(getDetailRows(item)).toEqual([
       { label: "구분", value: "전문약" },
-      { label: "우선", value: "예" },
+      { label: "먼저", value: "예" },
+      { label: "상태", value: "긴급" },
       { label: "유효기간", value: "2026년 11월 17일" },
       { label: "위치", value: "C2" },
       { label: "수량", value: "1" },
       { label: "담당", value: "혜미" },
       { label: "원본 경로", value: "teams/Q1/drugs/drug-1" }
     ]);
+    vi.useRealTimers();
   });
 
   it("splits manual improvement details into problem, fact, and proposal rows", () => {
@@ -85,7 +88,24 @@ describe("dense row display helpers", () => {
     expect(getDetailDescription(item)).toBe("알리미팜에서 카드용지를 신청한다.");
   });
 
-  it("orders drug list facts by priority, expiry, quantity, and location", () => {
+  it("shows the stored change category in detail rows", () => {
+    const item = normalizeTopic("topic-1", {
+      title: "근무표 변경",
+      category: "스케줄"
+    });
+
+    expect(getDetailRows(item)).toContainEqual({ label: "카테고리", value: "스케줄" });
+  });
+
+  it("keeps change status available in detail rows", () => {
+    const active = normalizeTopic("active", { title: "유효", status: "active" });
+    const done = normalizeTopic("done", { title: "완료", status: "done" });
+
+    expect(getDetailRows(active)).toContainEqual({ label: "상태", value: "유효" });
+    expect(getDetailRows(done)).toContainEqual({ label: "상태", value: "완료" });
+  });
+
+  it("orders drug list facts by first flag, status, expiry, quantity, and location", () => {
     vi.setSystemTime(new Date("2026-07-08T00:00:00+09:00"));
     const item = normalizeDrug("drug-1", {
       name: "케토톱",
@@ -96,12 +116,31 @@ describe("dense row display helpers", () => {
     }, "Q2");
 
     expect(getDrugListFacts(item)).toEqual([
-      { label: "우선", value: "우선" },
+      { label: "먼저", value: "먼저" },
+      { label: "상태", value: "긴급" },
       { label: "남은", value: "65일 남음" },
       { label: "유효", value: "2026년 9월 11일" },
       { label: "수량", value: "40매" },
       { label: "위치", value: "앞매대" }
     ]);
     vi.useRealTimers();
+  });
+
+  it("does not show operational status badges for drug rows", () => {
+    const drug = normalizeDrug("drug-1", { name: "약", exp: "2026-09-01" }, "Q1");
+    const change = normalizeTopic("topic-1", { title: "변경", status: "active" });
+    const manual = normalizeManualImprove("manual-1", { title: "매뉴얼", status: "pending" });
+
+    expect(shouldShowStatusBadge(drug)).toBe(false);
+    expect(shouldShowStatusBadge(change)).toBe(true);
+    expect(shouldShowStatusBadge(manual)).toBe(true);
+  });
+
+  it("shows valid change status badges on dense home rows", () => {
+    const change = normalizeTopic("topic-1", { title: "변경", status: "active" });
+    const drug = normalizeDrug("drug-1", { name: "약", exp: "2026-09-01" }, "Q1");
+
+    expect(shouldShowDenseStatusBadge(change)).toBe(true);
+    expect(shouldShowDenseStatusBadge(drug)).toBe(false);
   });
 });

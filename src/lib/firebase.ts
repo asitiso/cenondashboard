@@ -7,7 +7,7 @@ import {
   type Auth,
   type User
 } from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
+import { doc, getFirestore, updateDoc, type Firestore } from "firebase/firestore";
 
 export interface FirebaseServices {
   app: FirebaseApp;
@@ -65,4 +65,10 @@ export async function loginWithEmail(email: string, password: string): Promise<v
 export async function logout(): Promise<void> {
   const current = getFirebaseServices();
   if (current) await signOut(current.auth);
+}
+
+export async function toggleDrugPriority(path: string, nextPinned: boolean): Promise<void> {
+  const current = getFirebaseServices();
+  if (!current) throw new Error("Firebase 설정이 없어 먼저 표시를 변경할 수 없습니다.");
+  await updateDoc(doc(current.db, path), { pinned: nextPinned });
 }

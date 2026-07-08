@@ -633,6 +633,54 @@ h2 {
   margin-bottom: 10px;
 }
 
+.category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -2px 0 12px;
+}
+
+.category-chips button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #43594f;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.category-chips button.selected {
+  border-color: var(--green-700);
+  background: var(--green-700);
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(0, 98, 65, 0.16);
+}
+
+.category-chips.compact {
+  margin-top: -4px;
+}
+
+.inline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  margin: 0 0 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #43594f;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.inline-toggle input {
+  accent-color: var(--green-700);
+}
+
 .search-box {
   display: flex;
   align-items: center;
@@ -653,6 +701,39 @@ h2 {
 .work-list {
   display: grid;
   gap: 8px;
+}
+
+.category-group-list {
+  display: grid;
+  gap: 14px;
+}
+
+.category-group {
+  display: grid;
+  gap: 8px;
+}
+
+.category-group > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 2px 0;
+  color: var(--green-900);
+}
+
+.category-group > header strong {
+  font-size: 14px;
+}
+
+.category-group > header span {
+  min-width: 28px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--green-100);
+  color: var(--green-800);
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
 }
 
 .item-row {
@@ -720,6 +801,8 @@ h2 {
   border-radius: 999px;
   background: #f8fbf9;
   color: #24483a;
+  font: inherit;
+  text-align: left;
   white-space: nowrap;
 }
 
@@ -740,11 +823,39 @@ h2 {
   border-color: var(--green-800);
   background: var(--green-800);
   color: #ffffff;
+  cursor: pointer;
+}
+
+.drug-fact.first-toggle {
+  cursor: pointer;
 }
 
 .drug-fact.priority small,
 .drug-fact.priority strong {
   color: #ffffff;
+}
+
+.drug-fact.priority:focus-visible {
+  outline: 2px solid var(--green-300);
+  outline-offset: 2px;
+}
+
+.drug-fact.drug-status.긴급 {
+  border-color: #ffd0c0;
+  background: #ffe6dc;
+  color: #9f3c21;
+}
+
+.drug-fact.drug-status.주의 {
+  border-color: #efe0ad;
+  background: var(--cream);
+  color: #806219;
+}
+
+.drug-fact.drug-status.양호 {
+  border-color: #cfe6da;
+  background: var(--green-100);
+  color: var(--green-900);
 }
 
 .row-meta {

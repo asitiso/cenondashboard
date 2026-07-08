@@ -1,4 +1,5 @@
 import type { DashboardItem, DrugCategory, ItemStatus, Urgency } from "../types";
+import { normalizeChangeCategory } from "./changeCategories";
 
 type RawDoc = Record<string, unknown>;
 
@@ -89,6 +90,7 @@ export function normalizeTopic(id: string, doc: RawDoc): DashboardItem {
   const dueAt = pickDate(doc, ["dueAt", "deadline", "targetDate"]);
   const status = normalizeStatus(pickString(doc, ["status", "state", "progress"], "active"));
   const importance = pickString(doc, ["importance"]);
+  const changeCategory = normalizeChangeCategory(pickString(doc, ["category", "카테고리", "changeCategory", "type", "group"]));
   return {
     id,
     kind: "change",
@@ -101,7 +103,8 @@ export function normalizeTopic(id: string, doc: RawDoc): DashboardItem {
     createdAt: pickDate(doc, ["createdAt", "created_at"]),
     updatedAt: pickDate(doc, ["lastUpdatedAt", "updatedAt", "updated_at", "modifiedAt"]),
     dueAt,
-    tags: normalizeTags(doc.category, importance, doc.tags, doc.keywords),
+    changeCategory,
+    tags: normalizeTags(changeCategory, importance, doc.tags, doc.keywords),
     raw: doc
   };
 }
@@ -160,7 +163,7 @@ export function normalizeDrug(id: string, doc: RawDoc, team: "Q1" | "Q2"): Dashb
     dueAt,
     category,
     isPriority,
-    tags: normalizeTags(isPriority ? "우선" : undefined, doc.category, loc, doc.tags, doc.keywords),
+    tags: normalizeTags(isPriority ? "먼저" : undefined, doc.category, loc, doc.tags, doc.keywords),
     raw: doc
   };
 }

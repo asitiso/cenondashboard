@@ -1,4 +1,6 @@
 import type { DashboardItem } from "../types";
+import { isCompletedChange } from "./changeStatus";
+import { getDrugRemainingDays, getDrugStatusLabel } from "./drugStatus";
 
 export interface DetailRow {
   label: string;
@@ -8,6 +10,14 @@ export interface DetailRow {
 export interface DrugListFact {
   label: string;
   value: string;
+}
+
+export function shouldShowStatusBadge(item: DashboardItem): boolean {
+  return item.kind !== "drug";
+}
+
+export function shouldShowDenseStatusBadge(item: DashboardItem): boolean {
+  return item.kind !== "drug";
 }
 
 export function formatKoreanDate(date?: Date): string {
@@ -52,7 +62,8 @@ export function getDetailRows(item: DashboardItem): DetailRow[] {
     const quantity = pickText(item.raw, ["qty", "quantity", "count"]);
     return present([
       { label: "구분", value: item.category === "prescription" ? "전문약" : "일반약" },
-      { label: "우선", value: item.isPriority ? "예" : "아니오" },
+      { label: "먼저", value: item.isPriority ? "예" : "아니오" },
+      { label: "상태", value: getDrugStatusLabel(item) },
       item.dueAt ? { label: "유효기간", value: formatKoreanDate(item.dueAt) } : undefined,
       location ? { label: "위치", value: location } : undefined,
       quantity ? { label: "수량", value: quantity } : undefined,
@@ -74,6 +85,8 @@ export function getDetailRows(item: DashboardItem): DetailRow[] {
   }
 
   return present([
+    item.changeCategory ? { label: "카테고리", value: item.changeCategory } : undefined,
+    item.kind === "change" ? { label: "상태", value: isCompletedChange(item) ? "완료" : "유효" } : undefined,
     { label: "내용", value: item.description },
     { label: "담당", value: item.owner },
     item.dueAt ? { label: "기한", value: formatKoreanDate(item.dueAt) } : undefined,
@@ -98,7 +111,8 @@ export function getDrugListFacts(item: DashboardItem): DrugListFact[] {
   const location = pickText(item.raw, ["loc", "location"]);
   const remaining = getRemainingDaysLabel(item);
   return [
-    item.isPriority ? { label: "우선", value: "우선" } : undefined,
+    { label: "먼저", value: "먼저" },
+    { label: "상태", value: getDrugStatusLabel(item) },
     remaining ? { label: "남은", value: remaining } : undefined,
     item.dueAt ? { label: "유효", value: formatKoreanDate(item.dueAt) } : undefined,
     quantity ? { label: "수량", value: quantity } : undefined,
@@ -107,10 +121,8 @@ export function getDrugListFacts(item: DashboardItem): DrugListFact[] {
 }
 
 export function getRemainingDaysLabel(item: DashboardItem, now = new Date()): string | undefined {
-  if (!item.dueAt) return undefined;
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dueDate = new Date(item.dueAt.getFullYear(), item.dueAt.getMonth(), item.dueAt.getDate());
-  const days = Math.ceil((dueDate.getTime() - today.getTime()) / 86400000);
+  const days = getDrugRemainingDays(item, now);
+  if (days === undefined) return undefined;
   if (days < 0) return `${Math.abs(days)}일 지남`;
   if (days === 0) return "오늘";
   return `${days}일 남음`;

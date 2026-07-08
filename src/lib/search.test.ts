@@ -23,7 +23,7 @@ describe("matchesItemSearch", () => {
       status: "review"
     }, "Q2");
 
-    expect(matchesItemSearch(item, "우선")).toBe(true);
+    expect(matchesItemSearch(item, "먼저")).toBe(true);
     expect(matchesItemSearch(item, "검토 대기")).toBe(true);
   });
 

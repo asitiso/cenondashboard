@@ -100,7 +100,7 @@ describe("normalization", () => {
     }, "Q2");
 
     expect(item.isPriority).toBe(true);
-    expect(item.tags).toContain("우선");
+    expect(item.tags).toContain("먼저");
   });
 });
 

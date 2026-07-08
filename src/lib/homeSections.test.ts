@@ -29,13 +29,28 @@ describe("buildHomeSections", () => {
     expect(sections[0].total).toBe(8);
   });
 
+  it("shows change items by latest update first on the home dashboard", () => {
+    const older = normalizeTopic("older", {
+      title: "older",
+      updatedAt: "2026-07-01T09:00:00+09:00"
+    });
+    const newer = normalizeTopic("newer", {
+      title: "newer",
+      updatedAt: "2026-07-08T09:00:00+09:00"
+    });
+
+    const sections = buildHomeSections([older, newer]);
+
+    expect(sections[0].items.map((item) => item.title)).toEqual(["newer", "older"]);
+  });
+
   it("puts priority drug items before other drug items", () => {
     const normal = normalizeDrug("normal", { name: "일반", exp: "2026-07-08" }, "Q2");
-    const priority = normalizeDrug("priority", { name: "우선", exp: "2027-08-20", pinned: true }, "Q2");
+    const priority = normalizeDrug("priority", { name: "먼저", exp: "2027-08-20", pinned: true }, "Q2");
 
     const sections = buildHomeSections([normal, priority]);
 
-    expect(sections[1].items.map((item) => item.title)).toEqual(["우선", "일반"]);
+    expect(sections[1].items.map((item) => item.title)).toEqual(["먼저", "일반"]);
   });
 
   it("filters the home drug section by selected category", () => {

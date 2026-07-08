@@ -1,5 +1,6 @@
 export type ItemKind = "change" | "manual" | "drug";
 export type DrugCategory = "prescription" | "otc";
+export type ChangeCategory = "약품변경" | "업무규칙" | "스케줄" | "고객응대" | "재고관리" | "장비/시설" | "기타";
 export type ItemStatus = "new" | "review" | "inProgress" | "done" | "overdue" | "archived";
 export type Urgency = "critical" | "high" | "normal" | "low";
 
@@ -21,6 +22,7 @@ export interface DashboardItem {
   updatedAt?: Date;
   dueAt?: Date;
   createdAt?: Date;
+  changeCategory?: ChangeCategory;
   category?: DrugCategory;
   isPriority?: boolean;
   tags: string[];
