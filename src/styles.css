@@ -48,6 +48,10 @@ button {
   grid-template-columns: 72px minmax(0, 1fr);
 }
 
+.sidebar-backdrop {
+  display: none;
+}
+
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -1376,30 +1380,113 @@ h2 {
   color: #9f3c21;
 }
 
-@media (max-width: 1100px) {
+@media (min-width: 981px) and (max-width: 1180px) {
+  .main-area {
+    padding: 12px;
+  }
+
+  .home-dashboard {
+    padding: 12px;
+  }
+
+  .home-section-grid {
+    gap: 8px;
+    grid-template-columns: 1fr 1.05fr 0.95fr;
+  }
+
+  .metric-strip {
+    min-width: 480px;
+    gap: 6px;
+  }
+
+  .compact-metric {
+    padding-inline: 8px;
+  }
+
+  .compact-metric strong {
+    font-size: 19px;
+  }
+
+  .content-grid {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 980px) {
   .app-shell {
     grid-template-columns: 1fr;
   }
 
-  .sidebar {
-    position: sticky;
-    top: 0;
-    z-index: 4;
-    flex-direction: row;
-    align-items: center;
-    overflow-x: auto;
+  .app-shell.sidebar-collapsed {
+    grid-template-columns: 1fr;
   }
 
-  .sidebar nav {
-    grid-auto-flow: column;
-    grid-auto-columns: max-content;
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    width: min(280px, 84vw);
+    transform: translateX(-105%);
+    transition: transform 180ms ease;
+    overflow-y: auto;
+    box-shadow: 18px 0 36px rgba(0, 61, 43, 0.28);
+  }
+
+  .mobile-menu-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .sidebar-collapsed .sidebar {
+    align-items: stretch;
+    padding: 18px 12px;
+  }
+
+  .sidebar-collapsed .brand {
+    width: auto;
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+
+  .sidebar-collapsed .brand-copy,
+  .sidebar-collapsed .nav-label,
+  .sidebar-collapsed .account-copy {
+    display: block;
+  }
+
+  .sidebar-collapsed .account-box .icon-button {
     display: grid;
   }
 
-  .account-box {
-    min-width: 220px;
-    margin-top: 0;
+  .sidebar-collapsed .sidebar-toggle {
     margin-left: auto;
+  }
+
+  .sidebar-collapsed .sidebar nav button {
+    justify-content: flex-start;
+    padding: 0 10px;
+  }
+
+  .sidebar-collapsed .account-box {
+    grid-template-columns: auto 1fr auto;
+    justify-items: stretch;
+    width: auto;
+    padding: 10px;
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 29;
+    display: none;
+    border: 0;
+    background: rgba(11, 43, 34, 0.38);
+  }
+
+  .mobile-menu-open .sidebar-backdrop {
+    display: block;
   }
 
   .content-grid {
@@ -1419,16 +1506,16 @@ h2 {
   .detail-panel {
     position: static;
   }
+
+  .mobile-menu {
+    display: grid;
+    place-items: center;
+  }
 }
 
 @media (max-width: 760px) {
   .main-area {
     padding: 12px;
-  }
-
-  .brand div:not(.brand-mark),
-  .account-box {
-    display: none;
   }
 
   .summary-grid,

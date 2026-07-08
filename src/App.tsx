@@ -25,7 +25,7 @@ import { buildHomeSections, type HomeDrugFilter } from "./lib/homeSections";
 import { buildHomeSummary } from "./lib/summary";
 import { sortChangesLatestFirst, sortForAction } from "./lib/sort";
 import { matchesItemSearch } from "./lib/search";
-import { DEFAULT_SIDEBAR_COLLAPSED } from "./lib/layout";
+import { COMPACT_LAYOUT_MAX_WIDTH, DEFAULT_SIDEBAR_COLLAPSED } from "./lib/layout";
 import { CHANGE_CATEGORIES, getChangeCategory, groupChangesByCategory, type ChangeCategoryGroup } from "./lib/changeCategories";
 import { shouldShowChangeInList } from "./lib/changeStatus";
 import { getDrugStatusLabel, type DrugStatusLabel } from "./lib/drugStatus";
@@ -783,6 +783,7 @@ export default function App() {
   const [selected, setSelected] = useState<DashboardItem | undefined>();
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(DEFAULT_SIDEBAR_COLLAPSED);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [manualEditor, setManualEditor] = useState<{ mode: "create" | "edit"; item?: DashboardItem } | null>(null);
 
   const viewItems = useMemo(() => ({
@@ -814,8 +815,22 @@ export default function App() {
     if (freshSelected && freshSelected !== selected) setSelected(freshSelected);
   }, [items, selected]);
 
+  useEffect(() => {
+    const closeMobileMenu = () => {
+      if (window.innerWidth > COMPACT_LAYOUT_MAX_WIDTH) setMobileMenuOpen(false);
+    };
+    window.addEventListener("resize", closeMobileMenu);
+    return () => window.removeEventListener("resize", closeMobileMenu);
+  }, []);
+
+  function navigateView(nextView: ViewKey) {
+    setView(nextView);
+    setMobileMenuOpen(false);
+  }
+
   return (
-    <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+    <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${mobileMenuOpen ? "mobile-menu-open" : ""}`}>
+      <button className="sidebar-backdrop" type="button" onClick={() => setMobileMenuOpen(false)} aria-label="메뉴 닫기" />
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark"><Sparkles size={18} /></div>
@@ -835,7 +850,7 @@ export default function App() {
         </div>
         <nav>
           {navItems.map(({ key, label, icon: Icon }) => (
-            <button key={key} className={view === key ? "active" : ""} onClick={() => setView(key)}>
+            <button key={key} className={view === key ? "active" : ""} onClick={() => navigateView(key)}>
               <Icon size={18} />
               <span className="nav-label">{label}</span>
             </button>
@@ -853,7 +868,7 @@ export default function App() {
 
       <main className="main-area">
         <header className="topbar">
-          <button className="mobile-menu" aria-label="메뉴"><Menu size={18} /></button>
+          <button className="mobile-menu" type="button" onClick={() => setMobileMenuOpen(true)} aria-label="메뉴 열기"><Menu size={18} /></button>
           <div>
             <strong>운영 대시보드</strong>
             <span>{loading ? "데이터 불러오는 중" : `${items.length}개 항목 연결됨`}</span>

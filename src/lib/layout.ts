@@ -1,1 +1,2 @@
 export const DEFAULT_SIDEBAR_COLLAPSED = true;
+export const COMPACT_LAYOUT_MAX_WIDTH = 980;
