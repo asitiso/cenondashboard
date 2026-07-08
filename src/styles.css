@@ -1079,22 +1079,22 @@ h2 {
 
 .detail-section-list.manual-flow .detail-section.highlight {
   margin-top: 2px;
-  padding: 14px 14px 14px 16px;
+  padding: 13px 12px;
   border-top: 1px solid #b7dccc;
-  border-left: 4px solid var(--green-800);
+  border-left: 2px solid #8fbeaa;
   border-radius: 8px;
   background: #eef7f2;
 }
 
 .detail-section-list.manual-flow .detail-section.highlight h3 {
   color: var(--green-900);
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .detail-section-list.manual-flow .detail-section.highlight dd {
   color: var(--green-900);
-  font-size: 15px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .detail-section.expiry {
