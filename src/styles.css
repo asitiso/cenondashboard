@@ -375,6 +375,45 @@ button {
   border-bottom: 1px solid var(--line);
 }
 
+.home-section-nav {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.home-section-nav h2,
+.home-section-nav p {
+  min-width: 0;
+}
+
+.home-section-nav span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--green-50);
+  color: var(--green-700);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.home-section-nav:hover h2 {
+  color: var(--green-700);
+}
+
+.home-section-nav:hover span {
+  background: var(--green-100);
+}
+
 .home-work-section header p {
   margin: 4px 0 0;
   color: var(--muted);

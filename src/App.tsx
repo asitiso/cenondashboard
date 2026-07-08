@@ -26,6 +26,7 @@ import { buildHomeSummary } from "./lib/summary";
 import { sortChangesLatestFirst, sortForAction } from "./lib/sort";
 import { matchesItemSearch } from "./lib/search";
 import { COMPACT_LAYOUT_MAX_WIDTH, DEFAULT_SIDEBAR_COLLAPSED } from "./lib/layout";
+import { getViewForHomeSection, type HomeSectionTargetView } from "./lib/navigation";
 import { CHANGE_CATEGORIES, getChangeCategory, groupChangesByCategory, type ChangeCategoryGroup } from "./lib/changeCategories";
 import { shouldShowChangeInList } from "./lib/changeStatus";
 import { getDrugStatusLabel, type DrugStatusLabel } from "./lib/drugStatus";
@@ -591,7 +592,15 @@ function GroupedWorkList({ groups, selected, onSelect }: { groups: ChangeCategor
   );
 }
 
-function HomeDashboard({ items, onSelect }: { items: DashboardItem[]; onSelect: (item: DashboardItem) => void }) {
+function HomeDashboard({
+  items,
+  onSelect,
+  onOpenSection
+}: {
+  items: DashboardItem[];
+  onSelect: (item: DashboardItem) => void;
+  onOpenSection: (view: HomeSectionTargetView) => void;
+}) {
   const [drugFilter, setDrugFilter] = useState<HomeDrugFilter>("all");
   const summary = buildHomeSummary(items);
   const sections = buildHomeSections(items, 7, drugFilter);
@@ -616,10 +625,11 @@ function HomeDashboard({ items, onSelect }: { items: DashboardItem[]; onSelect: 
         {sections.map((section) => (
           <article className={`home-work-section ${section.key}`} key={section.key}>
             <header>
-              <div>
+              <button className="home-section-nav" type="button" onClick={() => onOpenSection(getViewForHomeSection(section.key))}>
                 <h2>{section.title}</h2>
                 <p>{section.subtitle}</p>
-              </div>
+                <span aria-hidden="true">›</span>
+              </button>
               <div className="home-section-actions">
                 {section.key === "drugs" && (
                   <button
@@ -828,6 +838,12 @@ export default function App() {
     setMobileMenuOpen(false);
   }
 
+  function openHomeSection(nextView: HomeSectionTargetView) {
+    setSelected(undefined);
+    setOverlayOpen(false);
+    navigateView(nextView);
+  }
+
   return (
     <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${mobileMenuOpen ? "mobile-menu-open" : ""}`}>
       <button className="sidebar-backdrop" type="button" onClick={() => setMobileMenuOpen(false)} aria-label="메뉴 닫기" />
@@ -888,7 +904,7 @@ export default function App() {
           <LoginPanel onLogin={login} mockMode={mockMode} />
         ) : view === "home" ? (
           <>
-            <HomeDashboard items={items} onSelect={selectFromHome} />
+            <HomeDashboard items={items} onSelect={selectFromHome} onOpenSection={openHomeSection} />
             <DetailOverlay
               item={overlayOpen ? selected : undefined}
               onClose={() => setOverlayOpen(false)}
