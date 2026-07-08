@@ -965,10 +965,125 @@ h2 {
   line-height: 1.6;
 }
 
+.detail-section-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.detail-section {
+  padding: 12px;
+  border: 1px solid #e1ece6;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.detail-section h3 {
+  margin: 0 0 10px;
+  color: var(--green-900);
+  font-size: 13px;
+}
+
+.detail-section.primary {
+  border-color: #b8d9ca;
+  background: #fbfdfc;
+}
+
+.detail-section.primary .detail-list {
+  gap: 0;
+}
+
+.detail-section.primary .detail-list div {
+  grid-template-columns: 1fr;
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.detail-section.primary .detail-list dt {
+  display: none;
+}
+
+.detail-section.primary .detail-list dd {
+  color: #17352b;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.detail-section.highlight {
+  border-color: #9fd0bc;
+  background: var(--green-50);
+}
+
+.detail-section.highlight h3 {
+  color: var(--green-800);
+}
+
+.detail-section.highlight .detail-list dd {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.6;
+}
+
+.detail-section.expiry {
+  border-color: #9fd0bc;
+  background: linear-gradient(180deg, #f8fcfa, var(--green-50));
+}
+
+.detail-section.expiry .detail-list {
+  gap: 6px;
+}
+
+.detail-section.expiry .detail-list div:first-child dd {
+  color: var(--green-800);
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.detail-section.expiry .detail-list div:nth-child(2) dd {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.manual-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 16px;
+}
+
+.manual-status-actions button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #43594f;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.manual-status-actions button.selected {
+  border-color: var(--green-800);
+  background: var(--green-800);
+  color: #ffffff;
+}
+
+.manual-status-actions button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.manual-status-actions p {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+  color: #9f3c21;
+  font-size: 12px;
+}
+
 .detail-list {
   display: grid;
   gap: 8px;
-  margin: 18px 0;
+  margin: 0;
 }
 
 .detail-list div {
@@ -983,6 +1098,14 @@ h2 {
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
+}
+
+.detail-list .duplicate-label {
+  grid-template-columns: 1fr;
+}
+
+.detail-list .duplicate-label dt {
+  display: none;
 }
 
 .detail-list dd {

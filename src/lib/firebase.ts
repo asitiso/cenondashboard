@@ -7,7 +7,7 @@ import {
   type Auth,
   type User
 } from "firebase/auth";
-import { doc, getFirestore, updateDoc, type Firestore } from "firebase/firestore";
+import { doc, getFirestore, serverTimestamp, updateDoc, type Firestore } from "firebase/firestore";
 
 export interface FirebaseServices {
   app: FirebaseApp;
@@ -71,4 +71,13 @@ export async function toggleDrugPriority(path: string, nextPinned: boolean): Pro
   const current = getFirebaseServices();
   if (!current) throw new Error("Firebase 설정이 없어 먼저 표시를 변경할 수 없습니다.");
   await updateDoc(doc(current.db, path), { pinned: nextPinned });
+}
+
+export async function setManualReviewStatus(path: string, status: string): Promise<void> {
+  const current = getFirebaseServices();
+  if (!current) throw new Error("Firebase 설정이 없어 매뉴얼 개선 상태를 변경할 수 없습니다.");
+  await updateDoc(doc(current.db, path), {
+    status,
+    updatedAt: serverTimestamp()
+  });
 }

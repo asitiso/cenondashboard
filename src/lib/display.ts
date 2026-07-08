@@ -12,6 +12,12 @@ export interface DrugListFact {
   value: string;
 }
 
+export interface DetailSection {
+  title: string;
+  tone?: "primary" | "highlight" | "expiry";
+  rows: DetailRow[];
+}
+
 export function shouldShowStatusBadge(item: DashboardItem): boolean {
   return item.kind !== "drug";
 }
@@ -103,6 +109,55 @@ export function getDetailDescription(item: DashboardItem): string | undefined {
   );
   if (hasStructuredManualContent) return undefined;
   return item.description;
+}
+
+function detailSection(title: string, rows: Array<DetailRow | undefined>, tone?: DetailSection["tone"]): DetailSection | undefined {
+  const visibleRows = present(rows);
+  if (visibleRows.length === 0) return undefined;
+  return { title, tone, rows: visibleRows };
+}
+
+export function getDetailSections(item: DashboardItem): DetailSection[] {
+  if (item.kind === "change") {
+    return [
+      detailSection("내용", [{ label: "내용", value: item.description }], "primary"),
+      detailSection("정보", [
+        item.changeCategory ? { label: "분류", value: item.changeCategory } : undefined,
+        { label: "상태", value: isCompletedChange(item) ? "완료" : "유효" },
+        item.updatedAt ? { label: "최근 수정", value: formatKoreanDate(item.updatedAt) } : undefined,
+        { label: "담당", value: item.owner }
+      ])
+    ].filter((section): section is DetailSection => Boolean(section));
+  }
+
+  if (item.kind === "manual") {
+    return [
+      detailSection("현재 문제", [{ label: "현재 문제", value: pickText(item.raw, ["currentProblem"]) }]),
+      detailSection("확인된 사실", [{ label: "확인된 사실", value: pickText(item.raw, ["confirmedFact"]) }]),
+      detailSection("개선 제안", [{ label: "개선 제안", value: pickText(item.raw, ["proposal", "description", "reason", "memo"]) }], "highlight"),
+      detailSection("관리 정보", [
+        item.updatedAt ? { label: "최근 수정", value: formatKoreanDate(item.updatedAt) } : undefined,
+        { label: "요청자", value: item.owner }
+      ])
+    ].filter((section): section is DetailSection => Boolean(section));
+  }
+
+  const location = pickText(item.raw, ["loc", "location"]);
+  const quantity = pickText(item.raw, ["qty", "quantity", "count"]);
+  const remaining = getRemainingDaysLabel(item);
+  return [
+    detailSection("유효기간", [
+      remaining ? { label: "남은 일수", value: remaining } : undefined,
+      item.dueAt ? { label: "유효기간", value: formatKoreanDate(item.dueAt) } : undefined
+    ], "expiry"),
+    detailSection("약품 정보", [
+      { label: "상태", value: getDrugStatusLabel(item) },
+      { label: "구분", value: item.category === "prescription" ? "전문약" : "일반약" },
+      { label: "먼저", value: item.isPriority ? "예" : "아니오" },
+      quantity ? { label: "수량", value: quantity } : undefined,
+      location ? { label: "위치", value: location } : undefined
+    ])
+  ].filter((section): section is DetailSection => Boolean(section));
 }
 
 export function getDrugListFacts(item: DashboardItem): DrugListFact[] {

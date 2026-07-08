@@ -15,6 +15,7 @@ import {
   UserRound,
   X
 } from "lucide-react";
+import { useEffect } from "react";
 import { useDashboardData } from "./hooks/useDashboardData";
 import type { ChangeCategory, DashboardItem, DrugCategory, ItemKind, ItemStatus } from "./types";
 import { buildHomeSections, type HomeDrugFilter } from "./lib/homeSections";
@@ -29,8 +30,7 @@ import {
   formatKoreanDate,
   getDenseRowMeta,
   getDenseRowTimeLabel,
-  getDetailDescription,
-  getDetailRows,
+  getDetailSections,
   getDrugListFacts,
   shouldShowDenseStatusBadge,
   shouldShowStatusBadge
@@ -69,6 +69,12 @@ const homeDrugFilterLabel: Record<HomeDrugFilter, string> = {
   prescription: "전문약",
   otc: "일반약"
 };
+
+const manualStatusActions = [
+  { label: "검토중", value: "검토중", status: "review" },
+  { label: "반영완료", value: "반영완료", status: "done" },
+  { label: "보류", value: "보류", status: "archived" }
+] as const;
 
 function getNextHomeDrugFilter(filter: HomeDrugFilter): HomeDrugFilter {
   if (filter === "all") return "prescription";
@@ -131,6 +137,12 @@ function LoginPanel({ onLogin, mockMode }: { onLogin: (email: string, password: 
 function getStatusView(item: DashboardItem): { className: string; label: string } {
   if (item.kind === "change" && item.raw.status === "active") {
     return { className: "status-valid", label: "유효" };
+  }
+  if (item.kind === "manual" && item.status === "done") {
+    return { className: "status-done", label: "반영완료" };
+  }
+  if (item.kind === "manual" && item.status === "archived") {
+    return { className: "status-archived", label: "보류" };
   }
   return { className: `status-${item.status}`, label: statusLabel[item.status] };
 }
@@ -229,7 +241,16 @@ function ItemRow({
   );
 }
 
-function DetailPanel({ item }: { item?: DashboardItem }) {
+function DetailPanel({
+  item,
+  onSetManualStatus
+}: {
+  item?: DashboardItem;
+  onSetManualStatus?: (item: DashboardItem, status: string) => Promise<void>;
+}) {
+  const [savingStatus, setSavingStatus] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState("");
+
   if (!item) {
     return (
       <aside className="detail-panel empty">
@@ -239,8 +260,22 @@ function DetailPanel({ item }: { item?: DashboardItem }) {
     );
   }
 
-  const detailRows = getDetailRows(item);
-  const detailDescription = getDetailDescription(item);
+  const detailSections = getDetailSections(item);
+  const showManualActions = item.kind === "manual" && Boolean(onSetManualStatus);
+
+  async function setManualStatus(status: string) {
+    if (!onSetManualStatus || !item) return;
+    const currentItem = item;
+    setSavingStatus(status);
+    setStatusError("");
+    try {
+      await onSetManualStatus(currentItem, status);
+    } catch (err) {
+      setStatusError(err instanceof Error ? err.message : "상태를 저장하지 못했습니다.");
+    } finally {
+      setSavingStatus(null);
+    }
+  }
 
   return (
     <aside className="detail-panel">
@@ -251,12 +286,35 @@ function DetailPanel({ item }: { item?: DashboardItem }) {
         </div>
         {shouldShowStatusBadge(item) && <StatusBadge item={item} />}
       </div>
-      {detailDescription && <p className="detail-description">{detailDescription}</p>}
-      <dl className="detail-list">
-        {detailRows.map((row) => (
-          <div key={row.label}><dt>{row.label}</dt><dd>{row.value}</dd></div>
+      {showManualActions && (
+        <div className="manual-status-actions" aria-label="매뉴얼 개선 처리 상태">
+          {manualStatusActions.map((action) => (
+            <button
+              key={action.value}
+              className={item.status === action.status ? "selected" : ""}
+              type="button"
+              disabled={Boolean(savingStatus)}
+              onClick={() => void setManualStatus(action.value)}
+              aria-pressed={item.status === action.status}
+            >
+              {savingStatus === action.value ? "저장중" : action.label}
+            </button>
+          ))}
+          {statusError && <p>{statusError}</p>}
+        </div>
+      )}
+      <div className="detail-section-list">
+        {detailSections.map((section) => (
+          <section className={`detail-section ${section.tone ?? ""}`} key={section.title}>
+            <h3>{section.title}</h3>
+            <dl className="detail-list">
+              {section.rows.map((row) => (
+                <div className={row.label === section.title ? "duplicate-label" : ""} key={row.label}><dt>{row.label}</dt><dd>{row.value}</dd></div>
+              ))}
+            </dl>
+          </section>
         ))}
-      </dl>
+      </div>
       {item.tags.length > 0 && (
         <div className="tag-list">
           {item.tags.map((tag) => <span key={tag}>{tag}</span>)}
@@ -266,14 +324,22 @@ function DetailPanel({ item }: { item?: DashboardItem }) {
   );
 }
 
-function DetailOverlay({ item, onClose }: { item?: DashboardItem; onClose: () => void }) {
+function DetailOverlay({
+  item,
+  onClose,
+  onSetManualStatus
+}: {
+  item?: DashboardItem;
+  onClose: () => void;
+  onSetManualStatus?: (item: DashboardItem, status: string) => Promise<void>;
+}) {
   if (!item) return null;
   return (
     <div className="detail-overlay" role="dialog" aria-modal="true">
       <button className="overlay-backdrop" onClick={onClose} aria-label="상세 닫기" />
       <div className="overlay-panel">
         <button className="close-button" onClick={onClose} aria-label="상세 닫기"><X size={18} /></button>
-        <DetailPanel item={item} />
+        <DetailPanel item={item} onSetManualStatus={onSetManualStatus} />
       </div>
     </div>
   );
@@ -529,7 +595,7 @@ function ListView({
 }
 
 export default function App() {
-  const { items, user, loading, mockMode, errors, login, logout, toggleDrugPriority } = useDashboardData();
+  const { items, user, loading, mockMode, errors, login, logout, toggleDrugPriority, setManualReviewStatus } = useDashboardData();
   const [view, setView] = useState<ViewKey>("home");
   const [selected, setSelected] = useState<DashboardItem | undefined>();
   const [overlayOpen, setOverlayOpen] = useState(false);
@@ -547,6 +613,12 @@ export default function App() {
     setSelected(item);
     setOverlayOpen(true);
   };
+
+  useEffect(() => {
+    if (!selected) return;
+    const freshSelected = items.find((item) => item.source.path === selected.source.path);
+    if (freshSelected && freshSelected !== selected) setSelected(freshSelected);
+  }, [items, selected]);
 
   return (
     <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
@@ -608,7 +680,7 @@ export default function App() {
         ) : view === "home" ? (
           <>
             <HomeDashboard items={items} onSelect={selectFromHome} />
-            <DetailOverlay item={overlayOpen ? selected : undefined} onClose={() => setOverlayOpen(false)} />
+            <DetailOverlay item={overlayOpen ? selected : undefined} onClose={() => setOverlayOpen(false)} onSetManualStatus={setManualReviewStatus} />
           </>
         ) : (
           <div className="content-grid">
@@ -616,7 +688,7 @@ export default function App() {
             {view === "manual" && <ListView title="매뉴얼 개선" eyebrow="검토 대기와 장기 미처리 확인" items={viewItems.manual} selected={selected} onSelect={setSelected} />}
             {view === "drugs" && <ListView title="유기관리" eyebrow="전문약과 일반약을 함께 보되 원본 경로는 분리" items={viewItems.drugs} selected={selected} onSelect={setSelected} onTogglePriority={toggleDrugPriority} drugMode />}
             {view === "search" && <ListView title="통합 검색" eyebrow="네 컬렉션을 한 번에 검색" items={viewItems.search} selected={selected} onSelect={setSelected} />}
-            <DetailPanel item={selected} />
+            <DetailPanel item={selected} onSetManualStatus={setManualReviewStatus} />
           </div>
         )}
       </main>

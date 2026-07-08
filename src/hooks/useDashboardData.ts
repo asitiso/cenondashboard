@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, type DocumentData, type QuerySnapshot } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import type { DashboardItem } from "../types";
-import { getFirebaseServices, isFirebaseConfigured, loginWithEmail, logout, subscribeAuth, toggleDrugPriority } from "../lib/firebase";
+import { getFirebaseServices, isFirebaseConfigured, loginWithEmail, logout, setManualReviewStatus, subscribeAuth, toggleDrugPriority } from "../lib/firebase";
 import { mockItems } from "../lib/mockData";
 import { normalizeDrug, normalizeManualImprove, normalizeTopic } from "../lib/normalize";
 
@@ -15,6 +15,7 @@ interface DashboardDataState {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   toggleDrugPriority: (item: DashboardItem) => Promise<void>;
+  setManualReviewStatus: (item: DashboardItem, status: string) => Promise<void>;
 }
 
 function docsFromSnapshot(snapshot: QuerySnapshot<DocumentData>): Array<[string, Record<string, unknown>]> {
@@ -93,6 +94,7 @@ export function useDashboardData(): DashboardDataState {
     errors,
     login: loginWithEmail,
     logout,
-    toggleDrugPriority: (item) => toggleDrugPriority(item.source.path, !item.isPriority)
+    toggleDrugPriority: (item) => toggleDrugPriority(item.source.path, !item.isPriority),
+    setManualReviewStatus: (item, status) => setManualReviewStatus(item.source.path, status)
   };
 }

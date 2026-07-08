@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { normalizeDrug, normalizeManualImprove, normalizeTopic } from "./normalize";
-import { getDenseRowMeta, getDenseRowTimeLabel, getDetailDescription, getDetailRows, getDrugListFacts, shouldShowDenseStatusBadge, shouldShowStatusBadge } from "./display";
+import { getDenseRowMeta, getDenseRowTimeLabel, getDetailDescription, getDetailRows, getDetailSections, getDrugListFacts, shouldShowDenseStatusBadge, shouldShowStatusBadge } from "./display";
 
 describe("dense row display helpers", () => {
   it("shows drug location and quantity instead of owner on home rows", () => {
@@ -142,5 +142,63 @@ describe("dense row display helpers", () => {
 
     expect(shouldShowDenseStatusBadge(change)).toBe(true);
     expect(shouldShowDenseStatusBadge(drug)).toBe(false);
+  });
+
+  it("prioritizes change content in detail sections without showing source paths", () => {
+    const item = normalizeTopic("topic-1", {
+      title: "카드용지 주문 방법",
+      content: "알리미팜에서 카드용지를 신청한다.",
+      status: "active",
+      category: "업무규칙",
+      updatedAt: "2026-07-09"
+    });
+
+    const sections = getDetailSections(item);
+
+    expect(sections[0]).toEqual({
+      title: "내용",
+      tone: "primary",
+      rows: [{ label: "내용", value: "알리미팜에서 카드용지를 신청한다." }]
+    });
+    expect(sections.flatMap((section) => section.rows).some((row) => row.value.includes("topics/"))).toBe(false);
+  });
+
+  it("keeps manual details in problem, fact, proposal order while highlighting the proposal", () => {
+    const item = normalizeManualImprove("manual-1", {
+      title: "일반약 주문 시간",
+      currentProblem: "주문 마감시간이 매뉴얼에 없다.",
+      confirmedFact: "오후 12시와 오후 7시에 전송한다.",
+      proposal: "주문 매뉴얼에 전송 시간을 추가한다."
+    });
+
+    const sections = getDetailSections(item);
+
+    expect(sections.map((section) => section.title)).toEqual(["현재 문제", "확인된 사실", "개선 제안", "관리 정보"]);
+    expect(sections[2]).toMatchObject({ title: "개선 제안", tone: "highlight" });
+    expect(sections[2].rows[0].value).toBe("주문 매뉴얼에 전송 시간을 추가한다.");
+  });
+
+  it("prioritizes drug remaining days and expiry in detail sections without showing source paths", () => {
+    vi.setSystemTime(new Date("2026-07-08T00:00:00+09:00"));
+    const item = normalizeDrug("drug-1", {
+      name: "마그오캡슐",
+      exp: "2026-09-06",
+      loc: "K1",
+      qty: "3",
+      pinned: true
+    }, "Q1");
+
+    const sections = getDetailSections(item);
+
+    expect(sections[0]).toEqual({
+      title: "유효기간",
+      tone: "expiry",
+      rows: [
+        { label: "남은 일수", value: "60일 남음" },
+        { label: "유효기간", value: "2026년 9월 6일" }
+      ]
+    });
+    expect(sections.flatMap((section) => section.rows).some((row) => row.value.includes("teams/"))).toBe(false);
+    vi.useRealTimers();
   });
 });

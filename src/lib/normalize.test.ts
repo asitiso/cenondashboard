@@ -65,6 +65,12 @@ describe("normalization", () => {
     expect(item.tags).toEqual(["주문", "★★★★★"]);
   });
 
+  it("maps manual review button statuses from Firestore", () => {
+    expect(normalizeManualImprove("manual-review", { title: "검토", status: "검토중" }).status).toBe("review");
+    expect(normalizeManualImprove("manual-done", { title: "완료", status: "반영완료" }).status).toBe("done");
+    expect(normalizeManualImprove("manual-hold", { title: "보류", status: "보류" }).status).toBe("archived");
+  });
+
   it("maps real drug fields from Firestore", () => {
     const item = normalizeDrug("drug-real", {
       name: "케프라액",
