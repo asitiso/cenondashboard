@@ -8,10 +8,13 @@ import {
   LogOut,
   Menu,
   Pill,
+  Pencil,
+  Plus,
   RefreshCw,
   Search,
   Settings2,
   Sparkles,
+  Trash2,
   UserRound,
   X
 } from "lucide-react";
@@ -26,10 +29,12 @@ import { DEFAULT_SIDEBAR_COLLAPSED } from "./lib/layout";
 import { CHANGE_CATEGORIES, getChangeCategory, groupChangesByCategory, type ChangeCategoryGroup } from "./lib/changeCategories";
 import { shouldShowChangeInList } from "./lib/changeStatus";
 import { getDrugStatusLabel, type DrugStatusLabel } from "./lib/drugStatus";
+import type { ManualImproveInput } from "./lib/firebase";
 import {
   formatKoreanDate,
   getDenseRowMeta,
   getDenseRowTimeLabel,
+  getDetailPresentation,
   getDetailSections,
   getDrugListFacts,
   shouldShowDenseStatusBadge,
@@ -75,6 +80,36 @@ const manualStatusActions = [
   { label: "반영완료", value: "반영완료", status: "done" },
   { label: "보류", value: "보류", status: "archived" }
 ] as const;
+
+const emptyManualInput: ManualImproveInput = {
+  title: "",
+  currentProblem: "",
+  confirmedFact: "",
+  proposal: "",
+  category: "",
+  priority: ""
+};
+
+function pickRawString(raw: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = raw[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number") return String(value);
+  }
+  return "";
+}
+
+function manualInputFromItem(item?: DashboardItem): ManualImproveInput {
+  if (!item || item.kind !== "manual") return emptyManualInput;
+  return {
+    title: item.title,
+    currentProblem: pickRawString(item.raw, ["currentProblem"]),
+    confirmedFact: pickRawString(item.raw, ["confirmedFact"]),
+    proposal: pickRawString(item.raw, ["proposal", "description", "reason", "memo"]),
+    category: pickRawString(item.raw, ["category"]),
+    priority: pickRawString(item.raw, ["priority"])
+  };
+}
 
 function getNextHomeDrugFilter(filter: HomeDrugFilter): HomeDrugFilter {
   if (filter === "all") return "prescription";
@@ -243,13 +278,18 @@ function ItemRow({
 
 function DetailPanel({
   item,
-  onSetManualStatus
+  onSetManualStatus,
+  onEditManual,
+  onDeleteManual
 }: {
   item?: DashboardItem;
   onSetManualStatus?: (item: DashboardItem, status: string) => Promise<void>;
+  onEditManual?: (item: DashboardItem) => void;
+  onDeleteManual?: (item: DashboardItem) => Promise<void>;
 }) {
   const [savingStatus, setSavingStatus] = useState<string | null>(null);
   const [statusError, setStatusError] = useState("");
+  const [deletingManual, setDeletingManual] = useState(false);
 
   if (!item) {
     return (
@@ -261,6 +301,7 @@ function DetailPanel({
   }
 
   const detailSections = getDetailSections(item);
+  const detailPresentation = getDetailPresentation(item);
   const showManualActions = item.kind === "manual" && Boolean(onSetManualStatus);
 
   async function setManualStatus(status: string) {
@@ -274,6 +315,21 @@ function DetailPanel({
       setStatusError(err instanceof Error ? err.message : "상태를 저장하지 못했습니다.");
     } finally {
       setSavingStatus(null);
+    }
+  }
+
+  async function deleteManual() {
+    if (!item || !onDeleteManual) return;
+    const ok = window.confirm("이 매뉴얼 개선 항목을 삭제할까요? 삭제 후에는 되돌리기 어렵습니다.");
+    if (!ok) return;
+    setDeletingManual(true);
+    setStatusError("");
+    try {
+      await onDeleteManual(item);
+    } catch (err) {
+      setStatusError(err instanceof Error ? err.message : "삭제하지 못했습니다.");
+    } finally {
+      setDeletingManual(false);
     }
   }
 
@@ -303,7 +359,17 @@ function DetailPanel({
           {statusError && <p>{statusError}</p>}
         </div>
       )}
-      <div className="detail-section-list">
+      {item.kind === "manual" && (
+        <div className="manual-edit-actions" aria-label="매뉴얼 개선 편집">
+          <button type="button" onClick={() => onEditManual?.(item)} disabled={!onEditManual}>
+            <Pencil size={14} /> 수정
+          </button>
+          <button className="danger" type="button" onClick={() => void deleteManual()} disabled={!onDeleteManual || deletingManual}>
+            <Trash2 size={14} /> {deletingManual ? "삭제중" : "삭제"}
+          </button>
+        </div>
+      )}
+      <div className={`detail-section-list ${detailPresentation}`}>
         {detailSections.map((section) => (
           <section className={`detail-section ${section.tone ?? ""}`} key={section.title}>
             <h3>{section.title}</h3>
@@ -327,11 +393,15 @@ function DetailPanel({
 function DetailOverlay({
   item,
   onClose,
-  onSetManualStatus
+  onSetManualStatus,
+  onEditManual,
+  onDeleteManual
 }: {
   item?: DashboardItem;
   onClose: () => void;
   onSetManualStatus?: (item: DashboardItem, status: string) => Promise<void>;
+  onEditManual?: (item: DashboardItem) => void;
+  onDeleteManual?: (item: DashboardItem) => Promise<void>;
 }) {
   if (!item) return null;
   return (
@@ -339,8 +409,105 @@ function DetailOverlay({
       <button className="overlay-backdrop" onClick={onClose} aria-label="상세 닫기" />
       <div className="overlay-panel">
         <button className="close-button" onClick={onClose} aria-label="상세 닫기"><X size={18} /></button>
-        <DetailPanel item={item} onSetManualStatus={onSetManualStatus} />
+        <DetailPanel item={item} onSetManualStatus={onSetManualStatus} onEditManual={onEditManual} onDeleteManual={onDeleteManual} />
       </div>
+    </div>
+  );
+}
+
+function ManualEditorOverlay({
+  mode,
+  item,
+  onClose,
+  onCreate,
+  onUpdate
+}: {
+  mode: "create" | "edit";
+  item?: DashboardItem;
+  onClose: () => void;
+  onCreate: (input: ManualImproveInput) => Promise<void>;
+  onUpdate: (item: DashboardItem, input: ManualImproveInput) => Promise<void>;
+}) {
+  const [form, setForm] = useState<ManualImproveInput>(() => manualInputFromItem(item));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setForm(manualInputFromItem(item));
+    setError("");
+  }, [item]);
+
+  function updateField(key: keyof ManualImproveInput, value: string) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!form.title.trim()) {
+      setError("제목을 입력해 주세요.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      if (mode === "edit" && item) {
+        await onUpdate(item, form);
+      } else {
+        await onCreate(form);
+      }
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "저장하지 못했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="detail-overlay manual-editor-overlay" role="dialog" aria-modal="true">
+      <button className="overlay-backdrop" onClick={onClose} aria-label="편집 닫기" />
+      <form className="manual-editor-panel" onSubmit={submit}>
+        <div className="manual-editor-head">
+          <div>
+            <p className="eyebrow">매뉴얼 개선</p>
+            <h2>{mode === "edit" ? "수정" : "추가"}</h2>
+            <span>저장하면 상태는 반영완료로 기록됩니다.</span>
+          </div>
+          <button className="close-button inline" type="button" onClick={onClose} aria-label="편집 닫기"><X size={18} /></button>
+        </div>
+
+        <label>
+          제목
+          <input value={form.title} onChange={(event) => updateField("title", event.target.value)} required />
+        </label>
+        <label>
+          현재 문제
+          <textarea value={form.currentProblem} onChange={(event) => updateField("currentProblem", event.target.value)} rows={4} />
+        </label>
+        <label>
+          확인된 사실
+          <textarea value={form.confirmedFact} onChange={(event) => updateField("confirmedFact", event.target.value)} rows={4} />
+        </label>
+        <label>
+          개선 제안
+          <textarea value={form.proposal} onChange={(event) => updateField("proposal", event.target.value)} rows={5} />
+        </label>
+        <div className="manual-editor-grid">
+          <label>
+            카테고리
+            <input value={form.category} onChange={(event) => updateField("category", event.target.value)} placeholder="예: 주문" />
+          </label>
+          <label>
+            중요도
+            <input value={form.priority} onChange={(event) => updateField("priority", event.target.value)} placeholder="예: ★★★★☆" />
+          </label>
+        </div>
+        {error && <p className="form-error">{error}</p>}
+        <div className="manual-editor-actions">
+          <button type="button" onClick={onClose}>취소</button>
+          <button className="primary-button" type="submit" disabled={saving}>{saving ? "저장중" : "저장"}</button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -489,6 +656,7 @@ function ListView({
   selected,
   onSelect,
   onTogglePriority,
+  headerAction,
   drugMode = false,
   changeMode = false
 }: {
@@ -498,6 +666,7 @@ function ListView({
   selected?: DashboardItem;
   onSelect: (item: DashboardItem) => void;
   onTogglePriority?: (item: DashboardItem) => Promise<void>;
+  headerAction?: React.ReactNode;
   drugMode?: boolean;
   changeMode?: boolean;
 }) {
@@ -530,6 +699,7 @@ function ListView({
           <p className="eyebrow">{eyebrow}</p>
           <h1>{title}</h1>
         </div>
+        {headerAction}
       </div>
       {drugMode && (
         <div className="tabs">
@@ -595,11 +765,25 @@ function ListView({
 }
 
 export default function App() {
-  const { items, user, loading, mockMode, errors, login, logout, toggleDrugPriority, setManualReviewStatus } = useDashboardData();
+  const {
+    items,
+    user,
+    loading,
+    mockMode,
+    errors,
+    login,
+    logout,
+    toggleDrugPriority,
+    setManualReviewStatus,
+    createManualImprove,
+    updateManualImprove,
+    deleteManualImprove
+  } = useDashboardData();
   const [view, setView] = useState<ViewKey>("home");
   const [selected, setSelected] = useState<DashboardItem | undefined>();
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(DEFAULT_SIDEBAR_COLLAPSED);
+  const [manualEditor, setManualEditor] = useState<{ mode: "create" | "edit"; item?: DashboardItem } | null>(null);
 
   const viewItems = useMemo(() => ({
     changes: items.filter((item) => item.kind === "change"),
@@ -612,6 +796,16 @@ export default function App() {
   const selectFromHome = (item: DashboardItem) => {
     setSelected(item);
     setOverlayOpen(true);
+  };
+
+  const editManual = (item: DashboardItem) => {
+    setManualEditor({ mode: "edit", item });
+  };
+
+  const deleteManual = async (item: DashboardItem) => {
+    await deleteManualImprove(item);
+    setSelected(undefined);
+    setOverlayOpen(false);
   };
 
   useEffect(() => {
@@ -680,16 +874,44 @@ export default function App() {
         ) : view === "home" ? (
           <>
             <HomeDashboard items={items} onSelect={selectFromHome} />
-            <DetailOverlay item={overlayOpen ? selected : undefined} onClose={() => setOverlayOpen(false)} onSetManualStatus={setManualReviewStatus} />
+            <DetailOverlay
+              item={overlayOpen ? selected : undefined}
+              onClose={() => setOverlayOpen(false)}
+              onSetManualStatus={setManualReviewStatus}
+              onEditManual={editManual}
+              onDeleteManual={deleteManual}
+            />
           </>
         ) : (
           <div className="content-grid">
             {view === "changes" && <ListView title="변경사항" eyebrow="현재 반영하거나 확인할 변경" items={viewItems.changes} selected={selected} onSelect={setSelected} changeMode />}
-            {view === "manual" && <ListView title="매뉴얼 개선" eyebrow="검토 대기와 장기 미처리 확인" items={viewItems.manual} selected={selected} onSelect={setSelected} />}
+            {view === "manual" && (
+              <ListView
+                title="매뉴얼 개선"
+                eyebrow="검토 대기와 장기 미처리 확인"
+                items={viewItems.manual}
+                selected={selected}
+                onSelect={setSelected}
+                headerAction={(
+                  <button className="view-action-button" type="button" onClick={() => setManualEditor({ mode: "create" })}>
+                    <Plus size={16} /> 추가
+                  </button>
+                )}
+              />
+            )}
             {view === "drugs" && <ListView title="유기관리" eyebrow="전문약과 일반약을 함께 보되 원본 경로는 분리" items={viewItems.drugs} selected={selected} onSelect={setSelected} onTogglePriority={toggleDrugPriority} drugMode />}
             {view === "search" && <ListView title="통합 검색" eyebrow="네 컬렉션을 한 번에 검색" items={viewItems.search} selected={selected} onSelect={setSelected} />}
-            <DetailPanel item={selected} onSetManualStatus={setManualReviewStatus} />
+            <DetailPanel item={selected} onSetManualStatus={setManualReviewStatus} onEditManual={editManual} onDeleteManual={deleteManual} />
           </div>
+        )}
+        {manualEditor && (
+          <ManualEditorOverlay
+            mode={manualEditor.mode}
+            item={manualEditor.item}
+            onClose={() => setManualEditor(null)}
+            onCreate={createManualImprove}
+            onUpdate={updateManualImprove}
+          />
         )}
       </main>
     </div>

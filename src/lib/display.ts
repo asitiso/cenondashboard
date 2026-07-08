@@ -18,6 +18,8 @@ export interface DetailSection {
   rows: DetailRow[];
 }
 
+export type DetailPresentation = "section-cards" | "manual-flow";
+
 export function shouldShowStatusBadge(item: DashboardItem): boolean {
   return item.kind !== "drug";
 }
@@ -158,6 +160,10 @@ export function getDetailSections(item: DashboardItem): DetailSection[] {
       location ? { label: "위치", value: location } : undefined
     ])
   ].filter((section): section is DetailSection => Boolean(section));
+}
+
+export function getDetailPresentation(item: DashboardItem): DetailPresentation {
+  return item.kind === "manual" ? "manual-flow" : "section-cards";
 }
 
 export function getDrugListFacts(item: DashboardItem): DrugListFact[] {

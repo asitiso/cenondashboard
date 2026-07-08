@@ -7,12 +7,21 @@ import {
   type Auth,
   type User
 } from "firebase/auth";
-import { doc, getFirestore, serverTimestamp, updateDoc, type Firestore } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, getFirestore, serverTimestamp, updateDoc, type Firestore } from "firebase/firestore";
 
 export interface FirebaseServices {
   app: FirebaseApp;
   auth: Auth;
   db: Firestore;
+}
+
+export interface ManualImproveInput {
+  title: string;
+  currentProblem: string;
+  confirmedFact: string;
+  proposal: string;
+  category: string;
+  priority: string;
 }
 
 const firebaseConfig = {
@@ -80,4 +89,42 @@ export async function setManualReviewStatus(path: string, status: string): Promi
     status,
     updatedAt: serverTimestamp()
   });
+}
+
+function cleanManualInput(input: ManualImproveInput) {
+  return {
+    title: input.title.trim(),
+    currentProblem: input.currentProblem.trim(),
+    confirmedFact: input.confirmedFact.trim(),
+    proposal: input.proposal.trim(),
+    category: input.category.trim(),
+    priority: input.priority.trim(),
+    status: "반영완료"
+  };
+}
+
+export async function createManualImprove(input: ManualImproveInput): Promise<void> {
+  const current = getFirebaseServices();
+  if (!current) throw new Error("Firebase 설정이 없어 매뉴얼 개선을 추가할 수 없습니다.");
+  await addDoc(collection(current.db, "manual_improve"), {
+    ...cleanManualInput(input),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    createdBy: "dashboard"
+  });
+}
+
+export async function updateManualImprove(path: string, input: ManualImproveInput): Promise<void> {
+  const current = getFirebaseServices();
+  if (!current) throw new Error("Firebase 설정이 없어 매뉴얼 개선을 수정할 수 없습니다.");
+  await updateDoc(doc(current.db, path), {
+    ...cleanManualInput(input),
+    updatedAt: serverTimestamp()
+  });
+}
+
+export async function deleteManualImprove(path: string): Promise<void> {
+  const current = getFirebaseServices();
+  if (!current) throw new Error("Firebase 설정이 없어 매뉴얼 개선을 삭제할 수 없습니다.");
+  await deleteDoc(doc(current.db, path));
 }

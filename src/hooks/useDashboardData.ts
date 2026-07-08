@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, type DocumentData, type QuerySnapshot } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import type { DashboardItem } from "../types";
-import { getFirebaseServices, isFirebaseConfigured, loginWithEmail, logout, setManualReviewStatus, subscribeAuth, toggleDrugPriority } from "../lib/firebase";
+import { createManualImprove, deleteManualImprove, getFirebaseServices, isFirebaseConfigured, loginWithEmail, logout, setManualReviewStatus, subscribeAuth, toggleDrugPriority, updateManualImprove, type ManualImproveInput } from "../lib/firebase";
 import { mockItems } from "../lib/mockData";
 import { normalizeDrug, normalizeManualImprove, normalizeTopic } from "../lib/normalize";
 
@@ -16,6 +16,9 @@ interface DashboardDataState {
   logout: () => Promise<void>;
   toggleDrugPriority: (item: DashboardItem) => Promise<void>;
   setManualReviewStatus: (item: DashboardItem, status: string) => Promise<void>;
+  createManualImprove: (input: ManualImproveInput) => Promise<void>;
+  updateManualImprove: (item: DashboardItem, input: ManualImproveInput) => Promise<void>;
+  deleteManualImprove: (item: DashboardItem) => Promise<void>;
 }
 
 function docsFromSnapshot(snapshot: QuerySnapshot<DocumentData>): Array<[string, Record<string, unknown>]> {
@@ -95,6 +98,9 @@ export function useDashboardData(): DashboardDataState {
     login: loginWithEmail,
     logout,
     toggleDrugPriority: (item) => toggleDrugPriority(item.source.path, !item.isPriority),
-    setManualReviewStatus: (item, status) => setManualReviewStatus(item.source.path, status)
+    setManualReviewStatus: (item, status) => setManualReviewStatus(item.source.path, status),
+    createManualImprove,
+    updateManualImprove: (item, input) => updateManualImprove(item.source.path, input),
+    deleteManualImprove: (item) => deleteManualImprove(item.source.path)
   };
 }

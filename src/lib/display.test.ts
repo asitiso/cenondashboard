@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { normalizeDrug, normalizeManualImprove, normalizeTopic } from "./normalize";
-import { getDenseRowMeta, getDenseRowTimeLabel, getDetailDescription, getDetailRows, getDetailSections, getDrugListFacts, shouldShowDenseStatusBadge, shouldShowStatusBadge } from "./display";
+import { getDenseRowMeta, getDenseRowTimeLabel, getDetailDescription, getDetailPresentation, getDetailRows, getDetailSections, getDrugListFacts, shouldShowDenseStatusBadge, shouldShowStatusBadge } from "./display";
 
 describe("dense row display helpers", () => {
   it("shows drug location and quantity instead of owner on home rows", () => {
@@ -176,6 +176,16 @@ describe("dense row display helpers", () => {
     expect(sections.map((section) => section.title)).toEqual(["현재 문제", "확인된 사실", "개선 제안", "관리 정보"]);
     expect(sections[2]).toMatchObject({ title: "개선 제안", tone: "highlight" });
     expect(sections[2].rows[0].value).toBe("주문 매뉴얼에 전송 시간을 추가한다.");
+  });
+
+  it("uses a readable document flow for manual improvement details", () => {
+    const manual = normalizeManualImprove("manual-1", { title: "키즈존 외품 주문 가이드" });
+    const change = normalizeTopic("topic-1", { title: "변경", content: "내용" });
+    const drug = normalizeDrug("drug-1", { name: "약", exp: "2026-09-06" }, "Q1");
+
+    expect(getDetailPresentation(manual)).toBe("manual-flow");
+    expect(getDetailPresentation(change)).toBe("section-cards");
+    expect(getDetailPresentation(drug)).toBe("section-cards");
   });
 
   it("prioritizes drug remaining days and expiry in detail sections without showing source paths", () => {
