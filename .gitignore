@@ -1,0 +1,7 @@
+.env
+node_modules/
+dist/
+work/
+outputs/
+.codex-remote-attachments/
+.DS_Store
