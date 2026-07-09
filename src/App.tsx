@@ -18,7 +18,7 @@ import {
   UserRound,
   X
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useDashboardData } from "./hooks/useDashboardData";
 import type { ChangeCategory, DashboardItem, DrugCategory, ItemKind, ItemStatus } from "./types";
 import { buildHomeSections, type HomeDrugFilter } from "./lib/homeSections";
@@ -601,7 +601,7 @@ function HomeDashboard({
   onSelect: (item: DashboardItem) => void;
   onOpenSection: (view: HomeSectionTargetView) => void;
 }) {
-  const [drugFilter, setDrugFilter] = useState<HomeDrugFilter>("all");
+  const [drugFilter, setDrugFilter] = useState<HomeDrugFilter>("prescription");
   const summary = buildHomeSummary(items);
   const sections = buildHomeSections(items, 7, drugFilter);
 
@@ -627,8 +627,6 @@ function HomeDashboard({
             <header>
               <button className="home-section-nav" type="button" onClick={() => onOpenSection(getViewForHomeSection(section.key))}>
                 <h2>{section.title}</h2>
-                <p>{section.subtitle}</p>
-                <span aria-hidden="true">›</span>
               </button>
               <div className="home-section-actions">
                 {section.key === "drugs" && (
@@ -668,7 +666,8 @@ function ListView({
   onTogglePriority,
   headerAction,
   drugMode = false,
-  changeMode = false
+  changeMode = false,
+  latestFirst = false
 }: {
   title: string;
   eyebrow: string;
@@ -679,6 +678,7 @@ function ListView({
   headerAction?: React.ReactNode;
   drugMode?: boolean;
   changeMode?: boolean;
+  latestFirst?: boolean;
 }) {
   const [status, setStatus] = useState<"all" | ItemStatus>("all");
   const [query, setQuery] = useState("");
@@ -689,7 +689,7 @@ function ListView({
   const [includeCompletedChanges, setIncludeCompletedChanges] = useState(false);
 
   const filtered = useMemo(() => {
-    const sortedItems = changeMode ? sortChangesLatestFirst(items) : sortForAction(items);
+    const sortedItems = changeMode || latestFirst ? sortChangesLatestFirst(items) : sortForAction(items);
     return sortedItems.filter((item) => {
       const statusMatch = drugMode || changeMode || status === "all" || item.status === status;
       const drugMatch = !drugMode || drugTab === "all" || item.category === drugTab;
@@ -698,7 +698,7 @@ function ListView({
       const changeStatusMatch = !changeMode || shouldShowChangeInList(item, includeCompletedChanges);
       return statusMatch && drugMatch && drugStatusMatch && categoryMatch && changeStatusMatch && matchesItemSearch(item, query);
     });
-  }, [changeCategory, changeListMode, changeMode, drugMode, drugStatus, drugTab, includeCompletedChanges, items, query, status]);
+  }, [changeCategory, changeListMode, changeMode, drugMode, drugStatus, drugTab, includeCompletedChanges, items, latestFirst, query, status]);
 
   const changeGroups = useMemo(() => groupChangesByCategory(filtered), [filtered]);
 
@@ -795,6 +795,7 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(DEFAULT_SIDEBAR_COLLAPSED);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [manualEditor, setManualEditor] = useState<{ mode: "create" | "edit"; item?: DashboardItem } | null>(null);
+  const detailPanelRef = useRef<HTMLDivElement>(null);
 
   const viewItems = useMemo(() => ({
     changes: items.filter((item) => item.kind === "change"),
@@ -807,6 +808,15 @@ export default function App() {
   const selectFromHome = (item: DashboardItem) => {
     setSelected(item);
     setOverlayOpen(true);
+  };
+
+  const selectFromList = (item: DashboardItem) => {
+    setSelected(item);
+    if (window.innerWidth <= COMPACT_LAYOUT_MAX_WIDTH) {
+      window.requestAnimationFrame(() => {
+        detailPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
   };
 
   const editManual = (item: DashboardItem) => {
@@ -915,14 +925,15 @@ export default function App() {
           </>
         ) : (
           <div className="content-grid">
-            {view === "changes" && <ListView title="변경사항" eyebrow="현재 반영하거나 확인할 변경" items={viewItems.changes} selected={selected} onSelect={setSelected} changeMode />}
+            {view === "changes" && <ListView title="변경사항" eyebrow="현재 반영하거나 확인할 변경" items={viewItems.changes} selected={selected} onSelect={selectFromList} changeMode />}
             {view === "manual" && (
               <ListView
                 title="매뉴얼 개선"
                 eyebrow="검토 대기와 장기 미처리 확인"
                 items={viewItems.manual}
                 selected={selected}
-                onSelect={setSelected}
+                onSelect={selectFromList}
+                latestFirst
                 headerAction={(
                   <button className="view-action-button" type="button" onClick={() => setManualEditor({ mode: "create" })}>
                     <Plus size={16} /> 추가
@@ -930,9 +941,11 @@ export default function App() {
                 )}
               />
             )}
-            {view === "drugs" && <ListView title="유기관리" eyebrow="전문약과 일반약을 함께 보되 원본 경로는 분리" items={viewItems.drugs} selected={selected} onSelect={setSelected} onTogglePriority={toggleDrugPriority} drugMode />}
-            {view === "search" && <ListView title="통합 검색" eyebrow="네 컬렉션을 한 번에 검색" items={viewItems.search} selected={selected} onSelect={setSelected} />}
-            <DetailPanel item={selected} onSetManualStatus={setManualReviewStatus} onEditManual={editManual} onDeleteManual={deleteManual} />
+            {view === "drugs" && <ListView title="유기관리" eyebrow="전문약과 일반약을 함께 보되 원본 경로는 분리" items={viewItems.drugs} selected={selected} onSelect={selectFromList} onTogglePriority={toggleDrugPriority} drugMode />}
+            {view === "search" && <ListView title="통합 검색" eyebrow="네 컬렉션을 한 번에 검색" items={viewItems.search} selected={selected} onSelect={selectFromList} />}
+            <div className="detail-panel-anchor" ref={detailPanelRef}>
+              <DetailPanel item={selected} onSetManualStatus={setManualReviewStatus} onEditManual={editManual} onDeleteManual={deleteManual} />
+            </div>
           </div>
         )}
         {manualEditor && (

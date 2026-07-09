@@ -38,7 +38,7 @@ export function formatKoreanDate(date?: Date): string {
 }
 
 export function getDenseRowMeta(item: DashboardItem): string {
-  if (item.kind === "drug") return item.description;
+  if (item.kind === "drug") return item.dueAt ? formatKoreanDate(item.dueAt) : item.description;
   return item.owner;
 }
 

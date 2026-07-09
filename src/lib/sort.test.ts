@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeDrug, normalizeTopic } from "./normalize";
+import { normalizeDrug, normalizeManualImprove, normalizeTopic } from "./normalize";
 import { sortChangesLatestFirst, sortForAction } from "./sort";
 
 describe("sortForAction", () => {
@@ -43,5 +43,20 @@ describe("sortChangesLatestFirst", () => {
     const sorted = sortChangesLatestFirst([older, newer, createdOnly]);
 
     expect(sorted.map((item) => item.title)).toEqual(["newer", "created", "older"]);
+  });
+
+  it("sorts manual improvement items by latest update first", () => {
+    const older = normalizeManualImprove("older", {
+      title: "older",
+      updatedAt: "2026-07-01T09:00:00+09:00"
+    });
+    const newer = normalizeManualImprove("newer", {
+      title: "newer",
+      updatedAt: "2026-07-08T09:00:00+09:00"
+    });
+
+    const sorted = sortChangesLatestFirst([older, newer]);
+
+    expect(sorted.map((item) => item.title)).toEqual(["newer", "older"]);
   });
 });
