@@ -53,6 +53,10 @@ button {
 }
 
 .sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -301,7 +305,11 @@ button {
 }
 
 .home-dashboard {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  height: calc(100vh - 110px);
+  min-height: 560px;
   padding: 14px;
 }
 
@@ -357,10 +365,15 @@ button {
   grid-template-columns: 1.05fr 1.15fr 1fr;
   gap: 12px;
   align-items: stretch;
+  min-height: 0;
+  flex: 1;
 }
 
 .home-work-section {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
   padding: 12px;
   box-shadow: none;
 }
@@ -429,8 +442,14 @@ button {
 
 .dense-list {
   display: grid;
+  align-content: start;
   gap: 6px;
+  min-height: 0;
   padding-top: 10px;
+  padding-right: 4px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #9fcab8 transparent;
 }
 
 .dense-row {
@@ -930,7 +949,9 @@ h2 {
 
 .detail-panel-anchor {
   min-width: 0;
+  margin-top: var(--detail-panel-offset, 0);
   scroll-margin-top: 12px;
+  transition: margin-top 140ms ease;
 }
 
 .detail-overlay {
@@ -1509,9 +1530,26 @@ h2 {
     grid-template-columns: 1fr;
   }
 
+  .detail-panel-anchor {
+    margin-top: 0;
+  }
+
   .home-head,
   .home-section-grid {
     grid-template-columns: 1fr;
+  }
+
+  .home-dashboard {
+    height: auto;
+    min-height: 0;
+  }
+
+  .home-section-grid {
+    flex: none;
+  }
+
+  .home-work-section {
+    max-height: 420px;
   }
 
   .metric-strip {

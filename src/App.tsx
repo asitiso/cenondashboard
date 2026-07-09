@@ -603,7 +603,7 @@ function HomeDashboard({
 }) {
   const [drugFilter, setDrugFilter] = useState<HomeDrugFilter>("prescription");
   const summary = buildHomeSummary(items);
-  const sections = buildHomeSections(items, 7, drugFilter);
+  const sections = buildHomeSections(items, items.length, drugFilter);
 
   return (
     <section className="home-dashboard">
@@ -796,6 +796,7 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [manualEditor, setManualEditor] = useState<{ mode: "create" | "edit"; item?: DashboardItem } | null>(null);
   const detailPanelRef = useRef<HTMLDivElement>(null);
+  const [detailPanelOffset, setDetailPanelOffset] = useState(0);
 
   const viewItems = useMemo(() => ({
     changes: items.filter((item) => item.kind === "change"),
@@ -813,10 +814,19 @@ export default function App() {
   const selectFromList = (item: DashboardItem) => {
     setSelected(item);
     if (window.innerWidth <= COMPACT_LAYOUT_MAX_WIDTH) {
+      setDetailPanelOffset(0);
       window.requestAnimationFrame(() => {
         detailPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
+      return;
     }
+    window.requestAnimationFrame(() => {
+      const activeRow = document.querySelector(".content-grid .item-row.active");
+      const contentGrid = detailPanelRef.current?.closest(".content-grid");
+      if (!(activeRow instanceof HTMLElement) || !(contentGrid instanceof HTMLElement)) return;
+      const offset = activeRow.getBoundingClientRect().top - contentGrid.getBoundingClientRect().top;
+      setDetailPanelOffset(Math.max(0, Math.round(offset)));
+    });
   };
 
   const editManual = (item: DashboardItem) => {
@@ -845,6 +855,7 @@ export default function App() {
 
   function navigateView(nextView: ViewKey) {
     setView(nextView);
+    setDetailPanelOffset(0);
     setMobileMenuOpen(false);
   }
 
@@ -943,7 +954,11 @@ export default function App() {
             )}
             {view === "drugs" && <ListView title="유기관리" eyebrow="전문약과 일반약을 함께 보되 원본 경로는 분리" items={viewItems.drugs} selected={selected} onSelect={selectFromList} onTogglePriority={toggleDrugPriority} drugMode />}
             {view === "search" && <ListView title="통합 검색" eyebrow="네 컬렉션을 한 번에 검색" items={viewItems.search} selected={selected} onSelect={selectFromList} />}
-            <div className="detail-panel-anchor" ref={detailPanelRef}>
+            <div
+              className="detail-panel-anchor"
+              ref={detailPanelRef}
+              style={{ "--detail-panel-offset": `${detailPanelOffset}px` } as React.CSSProperties}
+            >
               <DetailPanel item={selected} onSetManualStatus={setManualReviewStatus} onEditManual={editManual} onDeleteManual={deleteManual} />
             </div>
           </div>
