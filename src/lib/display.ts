@@ -130,6 +130,10 @@ export function formatManualDetailTextForDisplay(value: string): string {
     .join("\n");
 }
 
+export function isNumberedManualLine(line: string): boolean {
+  return /^\d+\.\s/.test(line.trimStart());
+}
+
 export const formatConfirmedFactForDisplay = formatManualDetailTextForDisplay;
 
 export function getDetailSections(item: DashboardItem): DetailSection[] {

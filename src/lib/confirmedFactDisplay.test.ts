@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatConfirmedFactForDisplay, formatManualDetailTextForDisplay } from "./display";
+import { formatConfirmedFactForDisplay, formatManualDetailTextForDisplay, isNumberedManualLine } from "./display";
 
 describe("formatConfirmedFactForDisplay", () => {
   it("keeps the text content while making sentence breaks easier to read", () => {
@@ -35,5 +35,11 @@ describe("formatConfirmedFactForDisplay", () => {
     expect(formatManualDetailTextForDisplay(original)).toBe(
       "Add the ordering process:\n1. Put only target items in the cart\n2. Request price adjustment by phone\n3. Do not include other medicines\n4. Send after confirmation"
     );
+  });
+
+  it("identifies numbered manual lines for display spacing", () => {
+    expect(isNumberedManualLine("1. Put only target items in the cart")).toBe(true);
+    expect(isNumberedManualLine("  12. Confirm the order")).toBe(true);
+    expect(isNumberedManualLine("Add the ordering process:")).toBe(false);
   });
 });

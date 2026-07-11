@@ -1120,6 +1120,24 @@ h2 {
   word-break: keep-all;
 }
 
+.manual-text-line {
+  display: block;
+}
+
+.manual-text-line + .manual-text-line {
+  margin-top: 4px;
+}
+
+.manual-text-line.numbered {
+  margin-top: 6px;
+  padding-left: 1.15rem;
+  text-indent: -1.15rem;
+}
+
+.manual-text-line:not(.numbered) + .manual-text-line.numbered {
+  margin-top: 8px;
+}
+
 .detail-section-list.manual-flow .detail-section.highlight {
   margin-top: 2px;
   padding: 13px 12px;

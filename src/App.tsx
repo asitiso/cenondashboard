@@ -39,6 +39,7 @@ import {
   getDetailPresentation,
   getDetailSections,
   getDrugListFacts,
+  isNumberedManualLine,
   shouldShowDenseStatusBadge,
   shouldShowStatusBadge
 } from "./lib/display";
@@ -379,7 +380,7 @@ function DetailPanel({
               {section.rows.map((row) => (
                 <div className={row.label === section.title ? "duplicate-label" : ""} key={row.label}>
                   <dt>{row.label}</dt>
-                  <dd>{detailPresentation === "manual-flow" ? formatManualDetailTextForDisplay(row.value) : row.value}</dd>
+                  <dd>{detailPresentation === "manual-flow" ? <ManualDetailText value={row.value} /> : row.value}</dd>
                 </div>
               ))}
             </dl>
@@ -392,6 +393,18 @@ function DetailPanel({
         </div>
       )}
     </aside>
+  );
+}
+
+function ManualDetailText({ value }: { value: string }) {
+  return (
+    <>
+      {formatManualDetailTextForDisplay(value).split("\n").map((line, index) => (
+        <span className={`manual-text-line ${isNumberedManualLine(line) ? "numbered" : ""}`} key={`${index}-${line}`}>
+          {line}
+        </span>
+      ))}
+    </>
   );
 }
 
