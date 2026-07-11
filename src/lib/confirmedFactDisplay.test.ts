@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatConfirmedFactForDisplay } from "./display";
+import { formatConfirmedFactForDisplay, formatManualDetailTextForDisplay } from "./display";
 
 describe("formatConfirmedFactForDisplay", () => {
   it("keeps the text content while making sentence breaks easier to read", () => {
@@ -15,5 +15,11 @@ describe("formatConfirmedFactForDisplay", () => {
     const original = "Line one.\nLine two. Line three.";
 
     expect(formatConfirmedFactForDisplay(original)).toBe("Line one.\nLine two.\nLine three.");
+  });
+
+  it("uses the same readable formatting for manual summary text", () => {
+    const original = "Summary sentence one. Summary sentence two.";
+
+    expect(formatManualDetailTextForDisplay(original)).toBe("Summary sentence one.\nSummary sentence two.");
   });
 });

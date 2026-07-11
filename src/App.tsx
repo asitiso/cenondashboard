@@ -33,7 +33,7 @@ import { getDrugStatusLabel, type DrugStatusLabel } from "./lib/drugStatus";
 import type { ManualImproveInput } from "./lib/firebase";
 import {
   formatKoreanDate,
-  formatConfirmedFactForDisplay,
+  formatManualDetailTextForDisplay,
   getDenseRowMeta,
   getDenseRowTimeLabel,
   getDetailPresentation,
@@ -379,7 +379,7 @@ function DetailPanel({
               {section.rows.map((row) => (
                 <div className={row.label === section.title ? "duplicate-label" : ""} key={row.label}>
                   <dt>{row.label}</dt>
-                  <dd>{section.tone === "highlight" && detailPresentation === "manual-flow" ? formatConfirmedFactForDisplay(row.value) : row.value}</dd>
+                  <dd>{detailPresentation === "manual-flow" ? formatManualDetailTextForDisplay(row.value) : row.value}</dd>
                 </div>
               ))}
             </dl>

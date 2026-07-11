@@ -119,12 +119,14 @@ function detailSection(title: string, rows: Array<DetailRow | undefined>, tone?:
   return { title, tone, rows: visibleRows };
 }
 
-export function formatConfirmedFactForDisplay(value: string): string {
+export function formatManualDetailTextForDisplay(value: string): string {
   return value
     .split(/\r?\n/)
     .map((line) => line.replace(/([.!?])\s+/g, "$1\n"))
     .join("\n");
 }
+
+export const formatConfirmedFactForDisplay = formatManualDetailTextForDisplay;
 
 export function getDetailSections(item: DashboardItem): DetailSection[] {
   if (item.kind === "change") {
