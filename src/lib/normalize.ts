@@ -130,7 +130,7 @@ export function normalizeManualImprove(id: string, doc: RawDoc): DashboardItem {
     urgency: inferUrgency(status, dueAt, undefined, priority),
     owner: pickString(doc, ["requester", "owner", "writer", "createdBy"], "요청자 미지정"),
     source: { collection: "manual_improve", path: `manual_improve/${id}` },
-    createdAt: pickDate(doc, ["createdAt", "created_at"]),
+    createdAt: pickDate(doc, ["createdAt", "created_at", "submittedAt", "requestedAt", "requestDate", "inputAt", "date"]),
     updatedAt: pickDate(doc, ["updatedAt", "updated_at", "modifiedAt"]),
     dueAt,
     tags: normalizeTags(doc.category, priority, doc.tags, doc.keywords),

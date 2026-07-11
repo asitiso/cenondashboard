@@ -26,8 +26,8 @@ export function sortChangesLatestFirst(items: DashboardItem[]): DashboardItem[] 
 
 export function sortCreatedLatestFirst(items: DashboardItem[]): DashboardItem[] {
   return [...items].sort((a, b) => {
-    const aTime = a.createdAt?.getTime() ?? latestActivityTime(a);
-    const bTime = b.createdAt?.getTime() ?? latestActivityTime(b);
+    const aTime = a.createdAt?.getTime() ?? 0;
+    const bTime = b.createdAt?.getTime() ?? 0;
     return bTime - aTime;
   });
 }
