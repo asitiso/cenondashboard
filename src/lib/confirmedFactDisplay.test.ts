@@ -28,4 +28,12 @@ describe("formatConfirmedFactForDisplay", () => {
 
     expect(formatManualDetailTextForDisplay(original)).toBe("1. First step stays with its number.\n2. Second step also stays.");
   });
+
+  it("starts numbered steps on new lines after a colon", () => {
+    const original = "Add the ordering process: 1. Put only target items in the cart 2. Request price adjustment by phone 3. Do not include other medicines 4. Send after confirmation";
+
+    expect(formatManualDetailTextForDisplay(original)).toBe(
+      "Add the ordering process:\n1. Put only target items in the cart\n2. Request price adjustment by phone\n3. Do not include other medicines\n4. Send after confirmation"
+    );
+  });
 });

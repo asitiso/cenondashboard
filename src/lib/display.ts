@@ -122,7 +122,11 @@ function detailSection(title: string, rows: Array<DetailRow | undefined>, tone?:
 export function formatManualDetailTextForDisplay(value: string): string {
   return value
     .split(/\r?\n/)
-    .map((line) => line.replace(/(?<!\d)([.!?])\s+/g, "$1\n"))
+    .map((line) => line
+      .replace(/:\s+(?=\d+\.\s)/g, ":\n")
+      .replace(/\s+(?=\d+\.\s)/g, "\n")
+      .replace(/(?<!\d)([.!?])\s+/g, "$1\n")
+    )
     .join("\n");
 }
 
