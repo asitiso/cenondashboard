@@ -22,4 +22,10 @@ describe("formatConfirmedFactForDisplay", () => {
 
     expect(formatManualDetailTextForDisplay(original)).toBe("Summary sentence one.\nSummary sentence two.");
   });
+
+  it("does not split numbered list markers after digits", () => {
+    const original = "1. First step stays with its number. 2. Second step also stays.";
+
+    expect(formatManualDetailTextForDisplay(original)).toBe("1. First step stays with its number.\n2. Second step also stays.");
+  });
 });
