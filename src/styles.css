@@ -1136,6 +1136,9 @@ h2 {
   color: var(--green-900);
   font-size: 14px;
   font-weight: 700;
+  line-height: 1.75;
+  white-space: pre-line;
+  word-break: keep-all;
 }
 
 .detail-section.expiry {
