@@ -48,12 +48,12 @@ export function buildHomeSections(items: DashboardItem[], limit = 6, drugFilter:
       key: "manual" as const,
       title: "매뉴얼 개선",
       subtitle: "검토 대기와 장기 미처리",
-      source: openFirst.filter((item) => item.kind === "manual")
+      source: items.filter((item) => item.kind === "manual")
     }
   ];
 
   return sections.map(({ source, ...section }) => {
-    const sorted = section.key === "changes" ? sortChangesLatestFirst(source) : sortForDashboard(source);
+    const sorted = section.key === "changes" || section.key === "manual" ? sortChangesLatestFirst(source) : sortForDashboard(source);
     return {
       ...section,
       total: sorted.length,
