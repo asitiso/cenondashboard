@@ -1,5 +1,5 @@
 import type { DashboardItem, DrugCategory } from "../types";
-import { sortChangesLatestFirst } from "./sort";
+import { sortChangesLatestFirst, sortCreatedLatestFirst } from "./sort";
 import { isOpen } from "./summary";
 
 export type HomeSectionKey = "changes" | "drugs" | "manual";
@@ -53,7 +53,11 @@ export function buildHomeSections(items: DashboardItem[], limit = 6, drugFilter:
   ];
 
   return sections.map(({ source, ...section }) => {
-    const sorted = section.key === "changes" || section.key === "manual" ? sortChangesLatestFirst(source) : sortForDashboard(source);
+    const sorted = section.key === "changes"
+      ? sortChangesLatestFirst(source)
+      : section.key === "manual"
+        ? sortCreatedLatestFirst(source)
+        : sortForDashboard(source);
     return {
       ...section,
       total: sorted.length,

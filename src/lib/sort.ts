@@ -23,3 +23,11 @@ export function sortForAction(items: DashboardItem[]): DashboardItem[] {
 export function sortChangesLatestFirst(items: DashboardItem[]): DashboardItem[] {
   return [...items].sort((a, b) => latestActivityTime(b) - latestActivityTime(a));
 }
+
+export function sortCreatedLatestFirst(items: DashboardItem[]): DashboardItem[] {
+  return [...items].sort((a, b) => {
+    const aTime = a.createdAt?.getTime() ?? latestActivityTime(a);
+    const bTime = b.createdAt?.getTime() ?? latestActivityTime(b);
+    return bTime - aTime;
+  });
+}
