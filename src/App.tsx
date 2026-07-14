@@ -39,6 +39,7 @@ import {
   getDetailPresentation,
   getDetailSections,
   getDrugListFacts,
+  getDrugPriorityToggleLabel,
   isNumberedManualLine,
   shouldShowDenseStatusBadge,
   shouldShowStatusBadge
@@ -283,16 +284,20 @@ function DetailPanel({
   item,
   onSetManualStatus,
   onEditManual,
-  onDeleteManual
+  onDeleteManual,
+  onToggleDrugPriority
 }: {
   item?: DashboardItem;
   onSetManualStatus?: (item: DashboardItem, status: string) => Promise<void>;
   onEditManual?: (item: DashboardItem) => void;
   onDeleteManual?: (item: DashboardItem) => Promise<void>;
+  onToggleDrugPriority?: (item: DashboardItem) => Promise<void>;
 }) {
   const [savingStatus, setSavingStatus] = useState<string | null>(null);
   const [statusError, setStatusError] = useState("");
   const [deletingManual, setDeletingManual] = useState(false);
+  const [savingDrugPriority, setSavingDrugPriority] = useState(false);
+  const [drugPriorityError, setDrugPriorityError] = useState("");
 
   if (!item) {
     return (
@@ -336,6 +341,19 @@ function DetailPanel({
     }
   }
 
+  async function toggleDrugPriorityFromDetail() {
+    if (!item || item.kind !== "drug" || !onToggleDrugPriority) return;
+    setSavingDrugPriority(true);
+    setDrugPriorityError("");
+    try {
+      await onToggleDrugPriority(item);
+    } catch (err) {
+      setDrugPriorityError(err instanceof Error ? err.message : "먼저 표시를 저장하지 못했습니다.");
+    } finally {
+      setSavingDrugPriority(false);
+    }
+  }
+
   return (
     <aside className="detail-panel">
       <div className="detail-heading">
@@ -370,6 +388,20 @@ function DetailPanel({
           <button className="danger" type="button" onClick={() => void deleteManual()} disabled={!onDeleteManual || deletingManual}>
             <Trash2 size={14} /> {deletingManual ? "삭제중" : "삭제"}
           </button>
+        </div>
+      )}
+      {item.kind === "drug" && (
+        <div className="drug-detail-actions" aria-label="유기관리 빠른 처리">
+          <button
+            className={item.isPriority ? "selected" : ""}
+            type="button"
+            disabled={!onToggleDrugPriority || savingDrugPriority}
+            onClick={() => void toggleDrugPriorityFromDetail()}
+            aria-pressed={Boolean(item.isPriority)}
+          >
+            {getDrugPriorityToggleLabel(item, savingDrugPriority)}
+          </button>
+          {drugPriorityError && <p>{drugPriorityError}</p>}
         </div>
       )}
       <div className={`detail-section-list ${detailPresentation}`}>
@@ -413,13 +445,15 @@ function DetailOverlay({
   onClose,
   onSetManualStatus,
   onEditManual,
-  onDeleteManual
+  onDeleteManual,
+  onToggleDrugPriority
 }: {
   item?: DashboardItem;
   onClose: () => void;
   onSetManualStatus?: (item: DashboardItem, status: string) => Promise<void>;
   onEditManual?: (item: DashboardItem) => void;
   onDeleteManual?: (item: DashboardItem) => Promise<void>;
+  onToggleDrugPriority?: (item: DashboardItem) => Promise<void>;
 }) {
   if (!item) return null;
   return (
@@ -427,7 +461,7 @@ function DetailOverlay({
       <button className="overlay-backdrop" onClick={onClose} aria-label="상세 닫기" />
       <div className="overlay-panel">
         <button className="close-button" onClick={onClose} aria-label="상세 닫기"><X size={18} /></button>
-        <DetailPanel item={item} onSetManualStatus={onSetManualStatus} onEditManual={onEditManual} onDeleteManual={onDeleteManual} />
+        <DetailPanel item={item} onSetManualStatus={onSetManualStatus} onEditManual={onEditManual} onDeleteManual={onDeleteManual} onToggleDrugPriority={onToggleDrugPriority} />
       </div>
     </div>
   );
@@ -949,6 +983,7 @@ export default function App() {
               onSetManualStatus={setManualReviewStatus}
               onEditManual={editManual}
               onDeleteManual={deleteManual}
+              onToggleDrugPriority={toggleDrugPriority}
             />
           </>
         ) : (
@@ -976,7 +1011,7 @@ export default function App() {
               ref={detailPanelRef}
               style={{ "--detail-panel-offset": `${detailPanelOffset}px` } as React.CSSProperties}
             >
-              <DetailPanel item={selected} onSetManualStatus={setManualReviewStatus} onEditManual={editManual} onDeleteManual={deleteManual} />
+              <DetailPanel item={selected} onSetManualStatus={setManualReviewStatus} onEditManual={editManual} onDeleteManual={deleteManual} onToggleDrugPriority={toggleDrugPriority} />
             </div>
           </div>
         )}

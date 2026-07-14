@@ -198,6 +198,11 @@ export function getDrugListFacts(item: DashboardItem): DrugListFact[] {
   ].filter((fact): fact is DrugListFact => Boolean(fact));
 }
 
+export function getDrugPriorityToggleLabel(item: DashboardItem, saving = false): string {
+  if (saving) return "저장중";
+  return item.isPriority ? "먼저 해제" : "먼저 설정";
+}
+
 export function getRemainingDaysLabel(item: DashboardItem, now = new Date()): string | undefined {
   const days = getDrugRemainingDays(item, now);
   if (days === undefined) return undefined;

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { normalizeDrug, normalizeManualImprove, normalizeTopic } from "./normalize";
-import { getDenseRowMeta, getDenseRowTimeLabel, getDetailDescription, getDetailPresentation, getDetailRows, getDetailSections, getDrugListFacts, shouldShowDenseStatusBadge, shouldShowStatusBadge } from "./display";
+import { getDenseRowMeta, getDenseRowTimeLabel, getDetailDescription, getDetailPresentation, getDetailRows, getDetailSections, getDrugListFacts, getDrugPriorityToggleLabel, shouldShowDenseStatusBadge, shouldShowStatusBadge } from "./display";
 
 describe("dense row display helpers", () => {
   it("shows drug location and quantity instead of owner on home rows", () => {
@@ -211,5 +211,14 @@ describe("dense row display helpers", () => {
     });
     expect(sections.flatMap((section) => section.rows).some((row) => row.value.includes("teams/"))).toBe(false);
     vi.useRealTimers();
+  });
+
+  it("labels drug priority detail toggles by the next action", () => {
+    const normal = normalizeDrug("drug-normal", { name: "약", exp: "2026-09-06" }, "Q1");
+    const priority = normalizeDrug("drug-priority", { name: "약", exp: "2026-09-06", pinned: true }, "Q1");
+
+    expect(getDrugPriorityToggleLabel(normal)).toBe("먼저 설정");
+    expect(getDrugPriorityToggleLabel(priority)).toBe("먼저 해제");
+    expect(getDrugPriorityToggleLabel(priority, true)).toBe("저장중");
   });
 });
