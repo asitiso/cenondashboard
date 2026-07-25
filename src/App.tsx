@@ -22,6 +22,7 @@ import { useEffect, useRef } from "react";
 import { useDashboardData } from "./hooks/useDashboardData";
 import type { ChangeCategory, DashboardItem, DrugCategory, ItemKind, ItemStatus } from "./types";
 import { buildHomeSections, type HomeDrugFilter } from "./lib/homeSections";
+import { getSavedHomeDrugFilter, saveHomeDrugFilter } from "./lib/homeDrugFilterPreference";
 import { buildHomeSummary } from "./lib/summary";
 import { sortChangesLatestFirst, sortForAction } from "./lib/sort";
 import { matchesItemSearch } from "./lib/search";
@@ -652,7 +653,7 @@ function HomeDashboard({
   onSelect: (item: DashboardItem) => void;
   onOpenSection: (view: HomeSectionTargetView) => void;
 }) {
-  const [drugFilter, setDrugFilter] = useState<HomeDrugFilter>("prescription");
+  const [drugFilter, setDrugFilter] = useState<HomeDrugFilter>(() => getSavedHomeDrugFilter());
   const summary = buildHomeSummary(items);
   const sections = buildHomeSections(items, items.length, drugFilter);
 
@@ -684,7 +685,11 @@ function HomeDashboard({
                   <button
                     className="cycle-filter"
                     type="button"
-                    onClick={() => setDrugFilter((current) => getNextHomeDrugFilter(current))}
+                    onClick={() => setDrugFilter((current) => {
+                      const next = getNextHomeDrugFilter(current);
+                      saveHomeDrugFilter(next);
+                      return next;
+                    })}
                     aria-label={`유기관리 필터: ${homeDrugFilterLabel[drugFilter]}`}
                     title="전체, 전문약, 일반약 순서로 전환"
                   >
