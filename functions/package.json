@@ -7,7 +7,9 @@
     "node": "22"
   },
   "scripts": {
-    "test": "node --test test/*.test.cjs"
+    "test": "node --test test/*.test.cjs",
+    "export:manual-clone": "node scripts/export-manual-improve-from-clone.cjs",
+    "backfill:notion": "node scripts/backfill-from-jsonl.cjs"
   },
   "dependencies": {
     "firebase-functions": "^7.3.2"
