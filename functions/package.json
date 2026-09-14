@@ -1,0 +1,15 @@
+{
+  "name": "central-onnuri-functions",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.cjs",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "firebase-functions": "^7.3.2"
+  }
+}
