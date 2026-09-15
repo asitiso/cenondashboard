@@ -21,8 +21,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: functions/package.json
 
       - name: Validate required secrets
         shell: bash
@@ -64,9 +62,12 @@ jobs:
           NOTION_WEBHOOK_KEY: ${{ secrets.NOTION_WEBHOOK_KEY }}
         run: |
           set -euo pipefail
-          printf '%s' "$NOTION_API_KEY" | firebase functions:secrets:set NOTION_API_KEY --project "$FIREBASE_PROJECT_ID" --data-file -
-          printf '%s' "$NOTION_DATA_SOURCE_ID" | firebase functions:secrets:set NOTION_DATA_SOURCE_ID --project "$FIREBASE_PROJECT_ID" --data-file -
-          printf '%s' "$NOTION_WEBHOOK_KEY" | firebase functions:secrets:set NOTION_WEBHOOK_KEY --project "$FIREBASE_PROJECT_ID" --data-file -
+          printf '%s' "$NOTION_API_KEY" > "$RUNNER_TEMP/notion-api-key.txt"
+          printf '%s' "$NOTION_DATA_SOURCE_ID" > "$RUNNER_TEMP/notion-data-source-id.txt"
+          printf '%s' "$NOTION_WEBHOOK_KEY" > "$RUNNER_TEMP/notion-webhook-key.txt"
+          firebase functions:secrets:set NOTION_API_KEY --project "$FIREBASE_PROJECT_ID" --data-file "$RUNNER_TEMP/notion-api-key.txt"
+          firebase functions:secrets:set NOTION_DATA_SOURCE_ID --project "$FIREBASE_PROJECT_ID" --data-file "$RUNNER_TEMP/notion-data-source-id.txt"
+          firebase functions:secrets:set NOTION_WEBHOOK_KEY --project "$FIREBASE_PROJECT_ID" --data-file "$RUNNER_TEMP/notion-webhook-key.txt"
 
       - name: Deploy bidirectional sync functions
         run: |
@@ -75,15 +76,11 @@ jobs:
             --only functions:syncManualImproveToNotion,functions:notionManualWebhook \
             --non-interactive
 
-      - name: Show Notion webhook endpoint
+      - name: Print next step
         shell: bash
-        env:
-          NOTION_WEBHOOK_KEY: ${{ secrets.NOTION_WEBHOOK_KEY }}
         run: |
-          set -euo pipefail
-          URL="https://${FUNCTION_REGION}-${FIREBASE_PROJECT_ID}.cloudfunctions.net/notionManualWebhook?key=${NOTION_WEBHOOK_KEY}"
-          echo "Webhook endpoint configured."
-          echo "Open Notion connection settings > Webhooks > Create a subscription and use this endpoint:"
-          echo "::add-mask::$NOTION_WEBHOOK_KEY"
-          echo "$URL"
-          echo "After Notion sends its verification token, open the same URL with GET to retrieve it and paste it into Notion's Verify dialog."
+          echo "Deployment completed."
+          echo "In Notion connection settings > Webhooks, create a subscription using:"
+          echo "https://${FUNCTION_REGION}-${FIREBASE_PROJECT_ID}.cloudfunctions.net/notionManualWebhook?key=<NOTION_WEBHOOK_KEY>"
+          echo "Use the same value stored in the GitHub secret NOTION_WEBHOOK_KEY."
+          echo "After Notion sends the verification token, GET the same URL and paste verification_token into Notion's Verify dialog."
