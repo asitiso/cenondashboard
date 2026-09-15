@@ -1,122 +1,140 @@
-# Firebase → Notion 매뉴얼 개선 미러 설계
+# Firebase ↔ Notion 매뉴얼 개선 양방향 동기화 설계
 
 ## 목표
 
-Firestore `manual_improve/{improveId}`를 유일한 원본으로 유지하면서, 센트럴온누리약국 직원이 Notion에서 보기 좋은 형태로 매뉴얼 개선 내용을 확인할 수 있게 한다. 동기화 때문에 `manual_improve` 컬렉션 전체를 반복 조회하지 않는다.
+Firestore `manual_improve/{improveId}`와 Notion `매뉴얼 개선 · 동기화 DB`를 양방향으로 동기화한다. 대시보드나 약국업무비서에서 수정한 내용은 Notion으로, Notion 관리자 편집 보기에서 수정한 내용은 같은 Firestore 문서로 반영한다. 직원에게는 동일 데이터를 단순화한 `직원용 빠른 찾기` 화면으로 제공한다.
 
-## 원칙
+## 핵심 원칙
 
-- Firebase가 유일한 Source of Truth다.
-- Notion은 읽기 전용 미러이며 원본 업무 데이터는 Notion에서 수정하지 않는다.
-- 증분 동기화 경로에서는 Firestore 쿼리를 실행하지 않는다. Firestore trigger가 제공하는 변경 문서 snapshot만 사용한다.
-- Notion 행은 `Firebase ID`로 식별하여 재시도에도 중복 생성되지 않는 idempotent upsert로 처리한다.
-- 삭제된 Firebase 문서는 대응하는 Notion 페이지를 `in_trash=true`로 이동한다.
-- 초기 전체 이관은 운영 컬렉션을 반복 스캔하지 않고 Firestore 백업/복원본 또는 그 복원본에서 만든 JSON snapshot을 사용한다.
+- Firebase와 Notion의 업무 필드는 양쪽에서 편집 가능하다.
+- 대시보드는 기존 Firestore `onSnapshot()`을 그대로 사용하므로 Notion → Firebase 반영 뒤 별도 대시보드 동기화 코드는 필요하지 않다.
+- `manual_improve` 전체 컬렉션을 반복 조회하거나 폴링하지 않는다.
+- Firebase 변경은 Firestore document trigger의 해당 문서 snapshot만 사용한다.
+- Notion 변경은 webhook이 알려 준 해당 page만 읽고, 연결된 Firebase 문서 한 건만 읽거나 쓴다.
+- 동기화 메타데이터는 업무 문서에 섞지 않고 `_sync_manual_improve_notion/{firebaseId}`에 둔다.
+- 업무 필드의 canonical SHA-256 hash가 같으면 반대편 write를 생략해 Firebase → Notion → Firebase 무한 왕복을 막는다.
+- 삭제는 실수 방지를 위해 자동 양방향 삭제 대상에서 제외한다. 생성·수정만 자동 동기화한다.
+- 기존 `content`, `proposedContent` 같은 구형 Firestore 필드는 읽기 호환하며 원본 필드를 삭제하지 않는다.
 
-## 현재 구조
+## 데이터 위치
 
-프런트엔드 `src/hooks/useDashboardData.ts`는 `manual_improve` 전체 컬렉션에 `onSnapshot()`을 연결한다. 대시보드 자체의 기존 동작은 이번 작업에서 변경하지 않는다. 이번 기능은 별도 `functions/` 서버리스 백엔드로 추가한다.
+Firebase project: `todaysell-d4bbc`
 
-Firebase 프로젝트 ID는 기존 프런트 설정과 동일한 `todaysell-d4bbc`를 사용한다.
+- 업무 데이터: `manual_improve/{improveId}`
+- 동기화 상태: `_sync_manual_improve_notion/{improveId}`
+- Notion webhook verification token: `_sync_manual_improve_notion_config/webhook`
 
-## Notion 목적지
+Notion:
 
 - Hub: `약국 업무비서 · 매뉴얼 개선`
-- Database: `매뉴얼 개선 미러`
+- Database: `매뉴얼 개선 · 동기화 DB`
 - Data source ID: `d2a8faa8-5de1-4104-882c-2ab274afe0e4`
 
-미러 속성:
+## 양방향 업무 필드
 
-- `업무명`
-- `분류`
-- `상태`
-- `우선순위`
-- `직원용 한줄 요약`
-- `현재 문제`
-- `확인된 사실`
-- `개선 제안`
-- `작성 경로`
-- `Firebase ID`
-- `원본 수정일`
-- `동기화 상태`
-- `마지막 동기화`
+- 업무명 ↔ `title`
+- 분류 ↔ `category`
+- 상태 ↔ `status`
+- 우선순위 ↔ `priority`
+- 직원용 한줄 요약 ↔ `staffSummary`
+- 현재 문제 ↔ `currentProblem`
+- 확인된 사실 ↔ `confirmedFact`
+- 개선 제안 ↔ `proposal`
 
-직원용 보기는 기술 필드를 숨기고 `업무명 → 분류 → 한줄 요약 → 상태 → 우선순위` 중심으로 표시한다. 관리자는 별도 동기화 점검 보기에서 Firebase ID와 날짜를 확인한다.
+Notion의 `Firebase ID`, `동기화 상태`, `마지막 동기화`, `원본 수정일`, `작성 경로`는 시스템 관리 필드다. 직원용/관리자 편집 기본 화면에서는 기술 필드를 숨긴다.
 
-## 동기화 아키텍처
+## 직원용 UX
 
-Cloud Functions for Firebase 2nd gen의 `onDocumentWritten`을 `manual_improve/{improveId}`에 연결한다.
+직원은 `직원용 빠른 찾기`를 기본으로 사용한다. 기술 필드나 동기화 구조를 노출하지 않고 업무명, 분류, 상태, 우선순위, 한줄 요약 중심으로 빠르게 찾는다.
 
-1. 생성/수정 이벤트
-   - `event.data.after.data()`를 읽는다.
-   - Firebase document ID를 `Firebase ID`로 사용한다.
-   - Notion data source를 `Firebase ID == improveId` 조건으로 한 건만 조회한다.
-   - 없으면 새 페이지를 만들고, 있으면 기존 페이지 속성을 갱신한다.
-   - `동기화 상태=동기화완료`, `마지막 동기화=현재 시각`을 기록한다.
-2. 삭제 이벤트
-   - 같은 Firebase ID의 Notion 페이지를 조회한다.
-   - 있으면 `PATCH /v1/pages/{pageId}`에 `in_trash: true`를 보낸다.
-   - 없으면 성공으로 종료한다.
-3. 실패
-   - 함수가 예외를 다시 던져 Firebase의 2nd gen retry 정책이 재시도할 수 있게 한다.
-   - upsert가 Firebase ID 기반이라 재실행해도 중복이 생기지 않는다.
+관리자는 `관리자 편집` 보기에서 다음 업무 필드만 수정한다.
 
-## 값 정규화
+- 업무명
+- 분류
+- 상태
+- 우선순위
+- 직원용 한줄 요약
+- 현재 문제
+- 확인된 사실
+- 개선 제안
 
-Notion select 속성에 없는 값 때문에 전체 동기화가 실패하지 않도록 정규화한다.
+## Firebase → Notion
 
-- 분류: 허용 목록 밖 값은 `기타`
-- 상태: `검토중`, `검토완료`, `반영완료`; 없거나 알 수 없으면 `검토중`
-- 우선순위: `높음`, `중`, `보통`; `중간`은 `중`, 나머지 미지정 값은 `보통`
-- 작성 경로: `createdBy == dashboard`이면 `대시보드`; `assistant`, `gpt`, `업무비서` 계열이면 `업무비서`; 나머지는 `기타`
-- 직원용 한줄 요약: `confirmedFact → proposal → currentProblem → title` 순으로 첫 번째 비어 있지 않은 텍스트를 선택하고 공백을 정리한 뒤 120자로 제한한다.
-- 원본 수정일: Firestore `updatedAt`, 없으면 `createdAt`; Timestamp를 ISO 8601로 변환한다.
+Cloud Functions 2nd gen `onDocumentWritten('manual_improve/{improveId}')`를 사용한다.
 
-## Notion API
+1. 삭제 이벤트면 자동 삭제하지 않고 종료한다.
+2. 변경 문서 snapshot을 canonical 업무 데이터로 변환한다.
+3. SHA-256 hash를 계산한다.
+4. `_sync_manual_improve_notion/{improveId}`의 `lastSyncedHash`와 같으면 Notion write를 생략한다.
+5. 다르면 Notion에서 `Firebase ID == improveId`인 페이지를 한 건 조회한다.
+6. 없으면 생성, 있으면 수정한다.
+7. 성공 후 sync-state에 hash, source=`firebase`, Notion page ID를 기록한다.
 
-- API version: `2026-03-11`
-- 조회: `POST /v1/data_sources/{data_source_id}/query`
-- 생성: `POST /v1/pages`
-- 수정/휴지통: `PATCH /v1/pages/{page_id}`
-- 인증 토큰은 `NOTION_API_KEY` secret으로 관리한다.
-- data source ID는 `NOTION_DATA_SOURCE_ID` secret으로 관리한다.
+## Notion → Firebase
+
+Notion webhook에서 `page.created`, `page.properties_updated`를 수신한다.
+
+1. webhook private query key를 먼저 검사한다.
+2. 최초 verification payload의 `verification_token`은 별도 config 문서에 저장한다.
+3. 이후 이벤트는 `X-Notion-Signature` HMAC-SHA256을 raw body 기준으로 검증한다.
+4. webhook이 알려 준 Notion page 한 건을 최신 상태로 가져온다.
+5. 대상 data source가 아니면 무시한다.
+6. 업무 필드를 canonical 형태로 변환하고 hash를 계산한다.
+7. `Firebase ID`가 있으면 해당 Firestore 문서 한 건만 읽는다.
+8. Firebase와 이미 같은 업무 데이터면 write를 생략한다.
+9. 다르면 sync-state에 hash/source=`notion`을 먼저 기록한 뒤 Firestore 문서를 update한다. 이어 발생하는 Firebase trigger는 같은 hash를 보고 Notion 재쓰기를 생략한다.
+10. Notion에서 새 행을 만들었고 `Firebase ID`가 비어 있으면 `notion_<NotionPageId>` 형식의 결정적 문서 ID를 생성해 Firestore에 set하고, 그 ID를 Notion에 기록한다. webhook 재시도에도 중복 문서가 생기지 않는다.
+
+## 충돌 규칙
+
+양쪽에서 거의 동시에 수정할 경우 webhook/trigger가 처리할 때 가져온 최신 상태가 반영되는 last-write-wins 방식이다. 이벤트 payload 자체의 오래된 값을 신뢰하지 않고 각 대상의 최신 값을 읽는다.
+
+## 구형 스키마 호환
+
+기존 업무비서 데이터는 다음처럼 읽기 호환한다.
+
+- `currentProblem`이 없으면 `content`
+- `proposal`이 없으면 `proposedContent`
+- 제목은 `title`, `manualTitle`, `section`, `subject` 순으로 허용
+- 상태는 `status`, `reviewStatus`를 허용
+
+동기화가 이루어져도 기타 구형/추가 Firestore 필드는 삭제하지 않는다. Notion에서 수정할 때 필요한 canonical 업무 필드만 merge/update한다.
 
 ## 초기 전체 이관
 
-실시간 trigger는 배포 이후 변경부터 처리하므로 기존 문서에는 별도 1회 backfill이 필요하다.
+기존 문서 전체 최초 이관은 운영 `(default)` DB를 직접 전수 스캔하지 않는다. 임시 Firestore clone을 만든 뒤 clone의 `manual_improve`를 JSONL로 추출하고, 같은 Notion upsert 로직으로 1회 backfill한다.
 
-운영 DB에 지속적인 전수 listener를 추가하지 않는다. Firestore 백업을 별도 복원 위치에 복원한 뒤 `manual_improve`만 JSON Lines(`.jsonl`)로 추출하고, `functions/scripts/backfill-from-jsonl.cjs`가 동일한 Notion upsert 함수를 재사용해 한 번 이관한다.
-
-JSONL 한 줄 형식:
-
-```json
-{"id":"firestore-document-id","data":{"title":"...","currentProblem":"...","confirmedFact":"...","proposal":"...","category":"...","priority":"...","status":"...","createdBy":"...","updatedAt":"2026-09-15T00:00:00.000Z"}}
-```
-
-backfill은 운영 Firestore를 직접 조회하지 않는다.
+실시간 동기화가 켜진 뒤에는 전체 backfill이나 전체 컬렉션 폴링을 반복하지 않는다.
 
 ## 보안
 
-- Notion 토큰을 프런트 번들에 넣지 않는다.
-- 토큰과 data source ID는 Firebase Secret Manager parameter로 함수에만 바인딩한다.
-- Git 저장소에는 secret 값이 들어가지 않는다.
+Firebase Functions secrets:
 
-## 테스트
+- `NOTION_API_KEY`
+- `NOTION_DATA_SOURCE_ID`
+- `NOTION_WEBHOOK_KEY`
 
-외부 네트워크 없이 테스트 가능한 순수 동기화 모듈을 분리한다.
+Notion API token은 프런트 번들/Git 저장소에 넣지 않는다. Webhook endpoint URL에는 추측하기 어려운 `NOTION_WEBHOOK_KEY`를 query parameter로 사용하고, 실제 webhook body는 Notion verification token으로 HMAC 검증한다.
 
-- 값 정규화
-- Notion property payload 생성
-- Firebase ID로 조회
-- 신규 생성
-- 기존 수정
-- 삭제 시 휴지통 처리
-- Notion API 오류를 예외로 전달
-- 모든 요청에 `Notion-Version: 2026-03-11` 포함
+## 자동 삭제 정책
 
-## 비범위
+현재 자동 삭제 동기화는 비활성화한다.
 
-- 대시보드의 기존 `onSnapshot` 구조 최적화
-- Notion → Firebase 역방향 동기화
-- Notion에서 직원이 원본 내용을 수정하는 기능
-- AI가 매뉴얼 내용을 새로 생성하거나 재작성하는 기능
+- Firebase 문서 삭제 → Notion 자동 삭제하지 않음
+- Notion 페이지 휴지통 → Firebase 자동 삭제하지 않음
+
+삭제는 복구 비용이 크기 때문에 생성·수정 동기화가 안정화된 뒤 별도 정책으로 추가한다.
+
+## 테스트 범위
+
+- Firebase/Notion canonical shape와 동일 hash
+- 구형 `content` / `proposedContent` 호환
+- 동일 hash일 때 왕복 write 생략
+- Firebase 변경 → Notion upsert
+- Notion 변경 → Firebase update
+- Notion 신규 행 → 결정적 Firebase ID 생성
+- Notion webhook private key/HMAC 검증
+- webhook verification token 저장/캐시
+- sync metadata가 `manual_improve`와 분리됨
+- Firebase write 실패 시 sync-state rollback
+- 삭제 이벤트 자동 삭제 제외
