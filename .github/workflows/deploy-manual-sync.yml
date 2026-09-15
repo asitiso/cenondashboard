@@ -2,6 +2,10 @@ name: Deploy manual improve sync
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/deploy-manual-sync.yml'
 
 permissions:
   contents: read
