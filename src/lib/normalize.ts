@@ -117,9 +117,9 @@ export function normalizeManualImprove(id: string, doc: RawDoc): DashboardItem {
   const status = normalizeStatus(pickString(doc, ["status", "state", "reviewStatus"], "검토중"));
   const priority = pickString(doc, ["priority"]);
   const description = joinParts([
-    pickString(doc, ["currentProblem"]),
+    pickString(doc, ["currentProblem", "content"]),
     pickString(doc, ["confirmedFact"]),
-    pickString(doc, ["proposal", "description", "reason", "memo"])
+    pickString(doc, ["proposal", "proposedContent", "description", "reason", "memo"])
   ]);
   return {
     id,
