@@ -1,0 +1,88 @@
+name: Deploy manual improve sync
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FIREBASE_PROJECT_ID: todaysell-d4bbc
+      NOTION_DATA_SOURCE_ID: d2a8faa8-5de1-4104-882c-2ab274afe0e4
+      FUNCTION_REGION: us-central1
+    steps:
+      - name: Checkout prepared sync branch
+        uses: actions/checkout@v4
+        with:
+          ref: work/notion-manual-mirror-sync
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate required secrets
+        shell: bash
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_WEBHOOK_KEY: ${{ secrets.NOTION_WEBHOOK_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$FIREBASE_SERVICE_ACCOUNT_JSON" || { echo 'Missing FIREBASE_SERVICE_ACCOUNT_JSON'; exit 1; }
+          test -n "$NOTION_API_KEY" || { echo 'Missing NOTION_API_KEY'; exit 1; }
+          test -n "$NOTION_WEBHOOK_KEY" || { echo 'Missing NOTION_WEBHOOK_KEY'; exit 1; }
+
+      - name: Configure Google credentials
+        shell: bash
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
+          chmod 600 "$RUNNER_TEMP/firebase-service-account.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
+
+      - name: Install function dependencies
+        working-directory: functions
+        run: npm install
+
+      - name: Run function tests
+        working-directory: functions
+        run: npm test
+
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools@latest
+
+      - name: Configure Firebase secrets
+        shell: bash
+        env:
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_WEBHOOK_KEY: ${{ secrets.NOTION_WEBHOOK_KEY }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$NOTION_API_KEY" > "$RUNNER_TEMP/notion-api-key.txt"
+          printf '%s' "$NOTION_DATA_SOURCE_ID" > "$RUNNER_TEMP/notion-data-source-id.txt"
+          printf '%s' "$NOTION_WEBHOOK_KEY" > "$RUNNER_TEMP/notion-webhook-key.txt"
+          firebase functions:secrets:set NOTION_API_KEY --project "$FIREBASE_PROJECT_ID" --data-file "$RUNNER_TEMP/notion-api-key.txt"
+          firebase functions:secrets:set NOTION_DATA_SOURCE_ID --project "$FIREBASE_PROJECT_ID" --data-file "$RUNNER_TEMP/notion-data-source-id.txt"
+          firebase functions:secrets:set NOTION_WEBHOOK_KEY --project "$FIREBASE_PROJECT_ID" --data-file "$RUNNER_TEMP/notion-webhook-key.txt"
+
+      - name: Deploy bidirectional sync functions
+        run: |
+          firebase deploy \
+            --project "$FIREBASE_PROJECT_ID" \
+            --only functions:syncManualImproveToNotion,functions:notionManualWebhook \
+            --non-interactive
+
+      - name: Print next step
+        shell: bash
+        run: |
+          echo "Deployment completed."
+          echo "In Notion connection settings > Webhooks, create a subscription using:"
+          echo "https://${FUNCTION_REGION}-${FIREBASE_PROJECT_ID}.cloudfunctions.net/notionManualWebhook?key=<NOTION_WEBHOOK_KEY>"
+          echo "Use the same value stored in the GitHub secret NOTION_WEBHOOK_KEY."
+          echo "After Notion sends the verification token, GET the same URL and paste verification_token into Notion's Verify dialog."
