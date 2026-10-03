@@ -32,6 +32,7 @@ import { CHANGE_CATEGORIES, getChangeCategory, groupChangesByCategory, type Chan
 import { shouldShowChangeInList } from "./lib/changeStatus";
 import { getDrugStatusLabel, type DrugStatusLabel } from "./lib/drugStatus";
 import type { ManualImproveInput } from "./lib/firebase";
+import OrderApp, { TopNavigation } from "./order/OrderApp";
 import {
   formatKoreanDate,
   formatManualDetailTextForDisplay,
@@ -831,6 +832,19 @@ function ListView({
 }
 
 export default function App() {
+  const [active, setActive] = useState<"order" | "operations">("order");
+  const [visitedOperations, setVisitedOperations] = useState(false);
+  const navigate = (value: "order" | "operations") => {
+    if (value === "operations") setVisitedOperations(true);
+    setActive(value);
+  };
+  return <>
+    <div hidden={active !== "order"}><OrderApp onNavigate={navigate} /></div>
+    {visitedOperations && <div hidden={active !== "operations"}><OperationsDashboard onNavigate={navigate} /></div>}
+  </>;
+}
+
+function OperationsDashboard({ onNavigate }: { onNavigate: (value: "order" | "operations") => void }) {
   const {
     items,
     user,
@@ -962,10 +976,7 @@ export default function App() {
       <main className="main-area">
         <header className="topbar">
           <button className="mobile-menu" type="button" onClick={() => setMobileMenuOpen(true)} aria-label="메뉴 열기"><Menu size={18} /></button>
-          <div>
-            <strong>운영 대시보드</strong>
-            <span>{loading ? "데이터 불러오는 중" : `${items.length}개 항목 연결됨`}</span>
-          </div>
+          <TopNavigation active="operations" onNavigate={onNavigate} />
           {mockMode && <span className="mode-badge">목업 모드</span>}
           {!mockMode && <span className="mode-badge live"><CheckCircle2 size={14} /> 실시간</span>}
         </header>
