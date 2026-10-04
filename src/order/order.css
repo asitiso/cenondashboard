@@ -1363,6 +1363,18 @@
   color: #b71c1c;
   font-weight: 600;
 }
+.of-drop-tag {
+  font-size: 11px;
+  padding: 1px 3px;
+  background: #eef5ff;
+  color: #1565c0;
+  font-weight: 500;
+}
+.of-drop-tag.high {
+  border: 1px solid #1976d2;
+  color: #0d47a1;
+  font-weight: 600;
+}
 .of-product-details {
   border-top: 1px solid #ddd;
   padding: 7px 10px 0;
@@ -1394,6 +1406,24 @@
   border-left: 3px solid #b71c1c;
 }
 .of-price-rise small {
+  margin-top: 3px;
+}
+.of-price-drop {
+  background: #f1f6ff;
+  border-left: 3px solid #1976d2;
+  color: #14569a;
+  padding: 6px 8px;
+  font-size: 12px;
+  margin-bottom: 7px;
+}
+.of-price-drop strong {
+  font-weight: 600;
+}
+.of-price-drop.high {
+  border: 1px solid #1976d2;
+  border-left: 3px solid #0d47a1;
+}
+.of-price-drop small {
   margin-top: 3px;
 }
 .of-vendor-wrap {
