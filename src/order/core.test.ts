@@ -107,7 +107,7 @@ describe("PMIT import contracts", () => {
         memo: "",
       },
     ];
-    expect(() => pinBookmark(all, "new")).toThrow();
+    expect(pinBookmark(all, "new").find(b => b.id === "new")?.rank).toBe(10);
     const next = pinBookmark(all, "new", "p4");
     expect(next.find((b) => b.id === "new")?.rank).toBe(4);
     expect(next.find((b) => b.id === "p5")?.rank).toBe(5);

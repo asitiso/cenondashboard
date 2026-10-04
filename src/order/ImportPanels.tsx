@@ -8,7 +8,7 @@ import type {
   Preferences,
   Snapshot,
 } from "./types";
-import { CATEGORIES } from "./types";
+import { descendants, matchingImportLinks } from "./workspace";
 
 export function Modal({
   title,
@@ -306,6 +306,7 @@ export function BookmarkImport({
 }) {
   const [preview, setPreview] = useState<ReturnType<typeof parseBookmarks>>();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   return (
@@ -328,8 +329,11 @@ export function BookmarkImport({
               const p = parseBookmarks(await f.text());
               setPreview(p);
               setSelected(new Set());
+              setQuery("");
               setError("");
             } catch (err) {
+              setPreview(undefined);
+              setSelected(new Set());
               setError(err instanceof Error ? err.message : String(err));
             }
           }}
@@ -342,6 +346,12 @@ export function BookmarkImport({
       )}
       {preview && (
         <>
+          <input
+            aria-label="가져올 폴더·사이트 이름 검색"
+            placeholder="폴더·사이트 이름 검색"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
           <p>
             {preview.links.length}개 웹사이트 · 폴더 {preview.folders.length}개
             · 중복 URL {preview.duplicates}개
@@ -353,26 +363,59 @@ export function BookmarkImport({
             className="order-secondary"
             onClick={() =>
               setSelected(
+                new Set([
+                  ...selected,
+                  ...matchingImportLinks(
+                    preview.folders,
+                    preview.links,
+                    query,
+                  ).map((b) => b.id),
+                ]),
+              )
+            }
+          >
+            표시된 목록 선택
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setSelected(
                 new Set(
-                  preview.links
-                    .filter((b) => b.category !== "기타")
-                    .map((b) => b.id),
+                  [...selected].filter(
+                    (id) =>
+                      !matchingImportLinks(
+                        preview.folders,
+                        preview.links,
+                        query,
+                      ).some((b) => b.id === id),
+                  ),
                 ),
               )
             }
           >
-            업무 폴더 후보 선택
+            표시된 목록 선택 해제
           </button>
           <span className="order-inline-help">선택 {selected.size}개</span>
           <div className="order-bookmark-preview">
             {preview.folders.map((f) => {
-              const links = preview.links.filter((b) => b.folderId === f.id);
+              const ids = descendants(preview.folders, f.id);
+              const links = matchingImportLinks(
+                preview.folders,
+                preview.links,
+                query,
+              ).filter((b) => ids.has(b.folderId));
               if (!links.length) return null;
               return (
                 <details key={f.id}>
                   <summary>
                     <input
                       type="checkbox"
+                      ref={(node) => {
+                        if (node)
+                          node.indeterminate =
+                            links.some((b) => selected.has(b.id)) &&
+                            !links.every((b) => selected.has(b.id));
+                      }}
                       aria-label={`${f.name} 폴더 선택`}
                       checked={links.every((b) => selected.has(b.id))}
                       onClick={(e) => e.stopPropagation()}
@@ -388,34 +431,6 @@ export function BookmarkImport({
                     />
                     {f.name} <small>{links.length}개</small>
                   </summary>
-                  <label>
-                    가져올 분류
-                    <select
-                      value={f.category}
-                      onChange={(e) => {
-                        const cat = e.target.value;
-                        setPreview((p) =>
-                          p
-                            ? {
-                                ...p,
-                                folders: p.folders.map((x) =>
-                                  x.id === f.id ? { ...x, category: cat } : x,
-                                ),
-                                links: p.links.map((x) =>
-                                  x.folderId === f.id
-                                    ? { ...x, category: cat }
-                                    : x,
-                                ),
-                              }
-                            : p,
-                        );
-                      }}
-                    >
-                      {CATEGORIES.map((c) => (
-                        <option key={c}>{c}</option>
-                      ))}
-                    </select>
-                  </label>
                   {links.map((b) => (
                     <label
                       className="order-check order-preview-link"

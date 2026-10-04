@@ -1,18 +1,17 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowUp, ScanBarcode } from "lucide-react";
+import { useOrderData } from "./useOrderData";
+import { Modal, PurchaseImport } from "./ImportPanels";
+import { Favorites, FolderTree } from "./Favorites";
+import { SearchCard } from "./SearchCard";
+import { BarcodeCamera } from "./BarcodeCamera";
 import {
-  Folder,
-  Search,
-  Star,
-  Upload,
-  Settings2,
-  Menu,
-  ExternalLink,
-  Plus,
-} from "lucide-react";
-import { BookmarkImport, Modal, PurchaseImport } from "./ImportPanels";
-import { ProductPanel } from "./ProductPanel";
+  barcodeLink,
+  displayPrice,
+  shortName,
+  supplierRows,
+} from "./workspace";
 import {
-  pinBookmark,
   normalizeName,
   safeUrl,
   searchProducts,
@@ -20,19 +19,16 @@ import {
   todayKorea,
   topBookmarks,
 } from "./core";
-import { useOrderData } from "./useOrderData";
-import { CATEGORIES, usageLabel } from "./types";
-import type { Bookmark, BookmarkFolder, Product } from "./types";
+import { readCache } from "./storage";
+import type {
+  Bookmark,
+  Product,
+  Purchase,
+  Snapshot,
+  SupplierSetting,
+  Usage,
+} from "./types";
 import "./order.css";
-
-function withoutRank(b: Bookmark): Bookmark {
-  const { rank: _, ...rest } = b;
-  return rest;
-}
-function restored(b: Bookmark): Bookmark {
-  const { deletedAt: _, ...rest } = b;
-  return rest;
-}
 export function TopNavigation({
   active,
   onNavigate,
@@ -57,1106 +53,1385 @@ export function TopNavigation({
     </nav>
   );
 }
-
-function BookmarkEditor({
-  bookmark,
-  folders,
-  onSave,
-  onClose,
-}: {
-  bookmark?: Bookmark;
-  folders: BookmarkFolder[];
-  onSave: (b: Bookmark) => Promise<void>;
-  onClose: () => void;
-}) {
-  const [title, setTitle] = useState(bookmark?.title ?? "");
-  const [url, setUrl] = useState(bookmark?.url ?? "");
-  const [category, setCategory] = useState(bookmark?.category ?? "기타");
-  const [folderId, setFolderId] = useState(bookmark?.folderId ?? "");
-  const [memo, setMemo] = useState(bookmark?.memo ?? "");
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
-  return (
-    <Modal
-      title={bookmark ? "즐겨찾기 수정" : "즐겨찾기 추가"}
-      onClose={onClose}
-    >
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const valid = safeUrl(url);
-          if (!valid) {
-            setError("http 또는 https 웹사이트 주소를 입력해 주세요.");
-            return;
-          }
-          if (!title.trim()) return;
-          setSaving(true);
-          try {
-            await onSave({
-              ...bookmark,
-              id: bookmark?.id ?? stableId(`${valid}|${Date.now()}`),
-              title: title.trim(),
-              url: valid,
-              category,
-              folderId: folderId || `category-${stableId(category)}`,
-              memo: memo.trim(),
-              order: bookmark?.order ?? Date.now(),
-            });
-            onClose();
-          } catch (e) {
-            setError(e instanceof Error ? e.message : String(e));
-          } finally {
-            setSaving(false);
-          }
-        }}
-      >
-        <div className="order-form-grid">
-          <label>
-            사이트 이름
-            <input
-              required
-              value={title}
-              maxLength={100}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </label>
-          <label>
-            URL
-            <input
-              required
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://"
-            />
-          </label>
-          <label>
-            분류
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            폴더
-            <select
-              value={folderId}
-              onChange={(e) => setFolderId(e.target.value)}
-            >
-              <option value="">분류 바로 아래</option>
-              {folders.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            한 줄 메모
-            <input
-              value={memo}
-              maxLength={200}
-              onChange={(e) => setMemo(e.target.value)}
-            />
-          </label>
-        </div>
-        {error && (
-          <p className="order-error" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="order-actions">
-          <button className="order-primary" disabled={saving}>
-            {saving ? "저장 중…" : "저장"}
-          </button>
-          <button type="button" className="order-secondary" onClick={onClose}>
-            닫기
-          </button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
+type Dialog = {
+  kind:
+    | "manage"
+    | "favorites"
+    | "purchase"
+    | "camera"
+    | "short"
+    | "unit"
+    | "barcode"
+    | "supplier"
+    | "contact"
+    | "new"
+    | "classify"
+    | "mall";
+  p?: Product;
+  supplier?: string;
+  mode?: string;
+  from?: "manage";
+};
+const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 export default function OrderApp({
   onNavigate,
 }: {
   onNavigate: (v: "order" | "operations") => void;
 }) {
-  const data = useOrderData();
-  const { snapshot, preferences, days } = data;
-  const [query, setQuery] = useState("");
-  const deferred = useDeferredValue(query);
-  const [selectedId, setSelectedId] = useState("");
-  const [usage, setUsage] = useState("all");
-  const [notice, setNotice] = useState("");
-  const [modal, setModal] = useState<
-    "purchase" | "bookmarks" | "manage" | "newProduct" | null
-  >(null);
-  const [editor, setEditor] = useState<{ bookmark?: Bookmark } | null>(null);
-  const [replace, setReplace] = useState<Bookmark | null>(null);
-  const [collapsed, setCollapsed] = useState(() => {
+  const data = useOrderData(),
+    { snapshot, preferences: prefs } = data;
+  const [query, setQuery] = useState(""),
+    deferred = useDeferredValue(query);
+  const [scope, setScope] = useState<{ name: string; names: string[] } | null>(
+    null,
+  );
+  const [usage, setUsage] = useState<Usage | "all">("all"),
+    [sort, setSort] = useState("recent");
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const [closed, setClosed] = useState<Set<string>>(new Set());
+  const [dialog, setDialog] = useState<Dialog | null>(null);
+  const [notice, setNotice] = useState(""),
+    [pending, setPending] = useState("");
+  const [top, setTop] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const appRoot = useRef<HTMLDivElement>(null);
+  const [font, setFont] = useState(() => {
     try {
-      return localStorage.getItem("cenon-bookmark-sidebar") === "closed";
+      return localStorage.getItem("order-mobile-font") ?? "default";
     } catch {
-      return false;
+      return "default";
     }
   });
-  const [manageQuery, setManageQuery] = useState("");
-  const [trash, setTrash] = useState(false);
-  const visible = preferences.bookmarks.filter((b) => !b.deletedAt);
-  const hot = useMemo(
-    () => topBookmarks(preferences.bookmarks, days, todayKorea()),
-    [preferences.bookmarks, days],
-  );
-  const found = useMemo(
-    () => searchProducts(snapshot?.products ?? [], deferred),
-    [snapshot, deferred],
-  );
-  const selected = snapshot?.products.find((p) => p.id === selectedId);
-  const bookmarkResults = useMemo(
+  const [field, setField] = useState(""),
+    [baseUnit, setBaseUnit] = useState("정"),
+    [packUnit, setPackUnit] = useState("포장"),
+    [count, setCount] = useState("1"),
+    [address, setAddress] = useState(""),
+    [phone, setPhone] = useState(""),
+    [method, setMethod] = useState("사이트"),
+    [extra, setExtra] = useState(""),
+    [memo, setMemo] = useState(""),
+    [onlyProduct, setOnlyProduct] = useState(false),
+    [chosenSite, setChosenSite] = useState(""),
+    [busy, setBusy] = useState(false);
+  const [newUsage, setNewUsage] = useState<Usage>("retail");
+  const active = prefs.bookmarks.filter((b) => !b.deletedAt),
+    products = useMemo(() => {
+      const grouped = new Map<string, Product[]>();
+      for (const p of snapshot?.products ?? [])
+        grouped.set(p.baseId, [...(grouped.get(p.baseId) ?? []), p]);
+      return [...grouped.values()]
+        .map((list) =>
+          usage === "all" ? list[0] : list.find((p) => p.usage === usage),
+        )
+        .filter((p): p is Product => !!p);
+    }, [snapshot, usage]);
+  const suppliers = useMemo(
     () =>
-      deferred.trim()
-        ? visible
-            .filter((b) =>
-              normalizeName(`${b.title} ${b.memo} ${b.category}`).includes(
-                normalizeName(deferred),
-              ),
-            )
-            .slice(0, 30)
-        : [],
-    [deferred, preferences.bookmarks],
+      [
+        ...new Set(
+          (snapshot?.products ?? []).flatMap((p) => [
+            ...supplierRows(p).map((r) => r.supplier),
+            ...p.frequency.map((x) => x.supplier),
+            ...(p.manualSupplier ? [p.manualSupplier] : []),
+          ]),
+        ),
+      ].sort((a, b) => a.localeCompare(b, "ko")),
+    [snapshot],
   );
-  async function perform(fn: () => Promise<void>) {
+  const namesForSite = (b: Bookmark) => [
+    ...new Set([
+      ...(b.supplierNames ?? []),
+      ...Object.entries(prefs.suppliers)
+        .filter(([, s]) => s.bookmarkId === b.id)
+        .map(([n]) => n),
+    ]),
+  ];
+  const q = normalizeName(deferred),
+    supplierCandidates =
+      !scope && q ? suppliers.filter((n) => normalizeName(n).includes(q)) : [];
+  const siteCandidates =
+    !scope && q
+      ? active.filter((b) => normalizeName(b.title + " " + b.memo).includes(q))
+      : [];
+  const exact = supplierCandidates.find((n) => normalizeName(n) === q);
+  const context = scope?.names ?? (exact ? [exact] : []);
+  const nameMatches = useMemo(
+    () => searchProducts(products, deferred, false),
+    [products, deferred],
+  );
+  const found = useMemo(() => {
+    let items: Product[];
+    const direct = products.filter(
+      (p) =>
+        (prefs.barcodes?.[p.baseId] ?? []).includes(deferred.trim()) ||
+        p.code === deferred.trim(),
+    );
+    if (direct.length && deferred.trim()) items = direct;
+    else if (context.length) {
+      items = products.filter(
+        (p) =>
+          supplierRows(p).some((r) => context.includes(r.supplier)) ||
+          context.includes(p.manualSupplier ?? ""),
+      );
+      if (q && !exact) items = searchProducts(items, deferred, false).results;
+    } else
+      items =
+        q &&
+        !(
+          (supplierCandidates.length || siteCandidates.length) &&
+          nameMatches.suggested
+        )
+          ? nameMatches.results
+          : [];
+    if (context.length)
+      items.sort((a, b) => {
+        if (sort === "name") return a.name.localeCompare(b.name, "ko");
+        if (sort === "count")
+          return (
+            b.frequency
+              .filter((x) => context.includes(x.supplier))
+              .reduce((s, x) => s + x.count, 0) -
+            a.frequency
+              .filter((x) => context.includes(x.supplier))
+              .reduce((s, x) => s + x.count, 0)
+          );
+        const ad =
+            supplierRows(a).find((r) => context.includes(r.supplier))?.date ??
+            "",
+          bd =
+            supplierRows(b).find((r) => context.includes(r.supplier))?.date ??
+            "";
+        return bd.localeCompare(ad) || a.name.localeCompare(b.name, "ko");
+      });
+    return items;
+  }, [
+    products,
+    deferred,
+    prefs.barcodes,
+    prefs.bookmarks,
+    scope,
+    sort,
+    exact,
+    nameMatches,
+  ]);
+  const hot = topBookmarks(prefs.bookmarks, data.days, todayKorea());
+  async function run(fn: () => Promise<unknown>) {
+    setBusy(true);
     try {
       await fn();
-      data.setError("");
+      return true;
     } catch (e) {
-      data.setError(e instanceof Error ? e.message : String(e));
+      setNotice(message(e));
+      return false;
+    } finally {
+      setBusy(false);
     }
   }
-  function open(b: Bookmark, name?: string) {
+  function edit(d: Dialog) {
+    setNotice("");
+    setField(d.p ? shortName(d.p, prefs) : query);
+    if (d.kind === "unit" && d.p) {
+      const unit = prefs.units[d.p.baseId];
+      setCount(String(unit?.count ?? 1));
+      setBaseUnit(unit?.baseUnit ?? (d.p.usage === "dispensing" ? "정" : "개"));
+      setPackUnit(unit?.packUnit ?? "포장");
+    }
+    if ((d.kind === "supplier" || d.kind === "contact") && d.supplier) {
+      const conf =
+          prefs.productSuppliers?.[d.p?.baseId + "|" + d.supplier] ??
+          prefs.suppliers[d.supplier],
+        link = active.find((b) => b.id === conf?.bookmarkId);
+      setChosenSite(link?.id ?? "");
+      setAddress(link?.url ?? "");
+      setPhone(conf?.phone ?? link?.phone ?? "");
+      setMethod(
+        d.mode ??
+          conf?.methods?.[0] ??
+          link?.methods?.[0] ??
+          conf?.method ??
+          "사이트",
+      );
+      setExtra(conf?.methods?.[1] ?? link?.methods?.[1] ?? "");
+      setMemo(conf?.memo ?? link?.memo ?? "");
+      setOnlyProduct(
+        !!prefs.productSuppliers?.[d.p?.baseId + "|" + d.supplier],
+      );
+    }
+    if (d.kind === "barcode") setField(pending);
+    setDialog(d);
+  }
+  function close() {
+    if (dialog?.from === "manage") setDialog({ kind: "manage" });
+    else setDialog(null);
+  }
+  function focus() {
+    input.current?.focus();
+  }
+  function search(value: string) {
+    setQuery(value);
+    setUsage("all");
+    setOpen(new Set());
+    setClosed(new Set());
+  }
+  function selectScope(name: string, names: string[]) {
+    setScope({ name, names });
+    setQuery("");
+    setUsage("all");
+    setSort("recent");
+    setOpen(new Set());
+    setClosed(new Set());
+    if (!window.matchMedia("(pointer:coarse)").matches) focus();
+  }
+  async function copy(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setNotice("검색명 복사: " + value);
+    } catch {
+      setNotice("검색명을 복사하지 못했습니다. 직접 입력할 이름: " + value);
+    }
+  }
+  function openSite(b: Bookmark) {
     const url = safeUrl(b.url);
     if (!url) {
-      data.setError("사이트 주소를 확인해 주세요.");
+      edit({ kind: "supplier", supplier: b.supplierNames?.[0] ?? b.title });
       return;
-    }
-    if (name) {
-      void navigator.clipboard
-        .writeText(name)
-        .then(() => setNotice(`상품명 복사: ${name}`))
-        .catch(() =>
-          setNotice(
-            "상품명을 자동 복사하지 못했습니다. 상품 상세의 복사 버튼을 이용해 주세요.",
-          ),
-        );
     }
     window.open(url, "_blank", "noopener,noreferrer");
-    void perform(() => data.click(b.id));
+    void run(() => data.click(b.id));
   }
-  function pin(b: Bookmark) {
-    const alias = hot.fixed.some((x) => safeUrl(x.url) === safeUrl(b.url));
-    if (b.rank === undefined && !alias && hot.fixed.length >= 10) {
-      setReplace(b);
+  function order(p: Product, name: string, selectedMode?: string) {
+    const conf =
+        prefs.productSuppliers?.[p.baseId + "|" + name] ??
+        prefs.suppliers[name],
+      link =
+        active.find((b) => b.id === conf?.bookmarkId) ??
+        active.find((b) => b.title === name),
+      mode =
+        selectedMode ??
+        conf?.methods?.[0] ??
+        link?.methods?.[0] ??
+        conf?.method ??
+        "사이트";
+    if (mode === "사이트") {
+      if (!link?.url) {
+        edit({ kind: "supplier", p, supplier: name });
+        return;
+      }
+      void copy(shortName(p, prefs));
+      openSite(link);
+    } else edit({ kind: "contact", p, supplier: name, mode });
+  }
+  function scan(code: string) {
+    setDialog(null);
+    setScope(null);
+    search(code);
+    const match = (snapshot?.products ?? []).some(
+      (p) =>
+        (prefs.barcodes?.[p.baseId] ?? []).includes(code) || p.code === code,
+    );
+    setPending(match ? "" : code);
+    if (!match) {
+      setNotice("미등록 바코드 · 상품명 일부로 찾은 뒤 연결하세요.");
+      setQuery("");
+      focus();
+    }
+  }
+  const scanRef = useRef(scan);
+  scanRef.current = scan;
+  useEffect(() => {
+    if (
+      !window.matchMedia("(pointer:coarse)").matches &&
+      window.innerWidth > 800
+    )
+      input.current?.focus();
+    const update = () =>
+      setTop(window.scrollY > Math.max(300, window.innerHeight * 0.5));
+    window.addEventListener("scroll", update, { passive: true });
+    let buffer = "",
+      last = 0;
+    const keys = (e: KeyboardEvent) => {
+      if (!appRoot.current || appRoot.current.closest("[hidden]")) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        focus();
+        return;
+      }
+      const node = e.target as HTMLElement;
+      if (
+        node.closest('[role="dialog"]') ||
+        node.isContentEditable ||
+        ((node.tagName === "INPUT" ||
+          node.tagName === "TEXTAREA" ||
+          node.tagName === "SELECT") &&
+          node !== input.current)
+      )
+        return;
+      const now = performance.now();
+      if (now - last > 90) buffer = "";
+      if (e.key === "Enter") {
+        if (/^\d{8,14}$/.test(buffer)) {
+          e.preventDefault();
+          scanRef.current(buffer);
+        }
+        buffer = "";
+      } else if (/^\d$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
+        buffer += e.key;
+      } else buffer = "";
+      last = now;
+    };
+    document.addEventListener("keydown", keys, true);
+    return () => {
+      window.removeEventListener("scroll", update);
+      document.removeEventListener("keydown", keys, true);
+    };
+  }, []);
+  async function saveSupplier() {
+    if (!dialog?.supplier) return;
+    const name = dialog.supplier,
+      product = dialog.p;
+    const url = address.trim() ? safeUrl(address) : "";
+    if (address.trim() && !url) {
+      setNotice("http 또는 https 주소를 입력하세요.");
       return;
     }
-    void perform(() =>
-      data.change((p) => ({ ...p, bookmarks: pinBookmark(p.bookmarks, b.id) })),
-    );
-  }
-  function dragStart(
-    e: React.DragEvent,
-    type: "bookmark" | "folder",
-    id: string,
-  ) {
-    e.dataTransfer.setData("text/plain", JSON.stringify({ type, id }));
-    e.dataTransfer.effectAllowed = "move";
-  }
-  function drop(
-    e: React.DragEvent,
-    category: string,
-    folderId?: string,
-    beforeId?: string,
-  ) {
-    e.preventDefault();
-    e.stopPropagation();
-    try {
-      const dragged = JSON.parse(e.dataTransfer.getData("text/plain")) as {
-        type: string;
-        id: string;
-      };
-      void perform(() =>
+    if (
+      await run(() =>
         data.change((p) => {
-          if (dragged.type === "bookmark") {
-            const before = p.bookmarks.find((x) => x.id === beforeId);
-            return {
-              ...p,
-              bookmarks: p.bookmarks.map((b) =>
-                b.id === dragged.id
-                  ? {
-                      ...b,
-                      folderId: folderId ?? `category-${stableId(category)}`,
-                      category,
-                      order: before ? (before.order ?? 0) - 0.5 : Date.now(),
-                    }
-                  : b,
-              ),
-              folders: folderId
-                ? p.folders
-                : p.folders.some(
-                      (f) => f.id === `category-${stableId(category)}`,
-                    )
-                  ? p.folders
-                  : [
-                      ...p.folders,
-                      {
-                        id: `category-${stableId(category)}`,
-                        name: category,
-                        parentId: null,
-                        category,
-                        order: Date.now(),
-                      },
-                    ],
-            };
-          }
-          const moving = p.folders.find((f) => f.id === dragged.id);
-          if (!moving) return p;
-          let ancestor = folderId;
-          while (ancestor) {
-            if (ancestor === moving.id)
-              throw new Error(
-                "폴더를 자기 자신이나 하위 폴더로 옮길 수 없습니다.",
-              );
-            ancestor =
-              p.folders.find((f) => f.id === ancestor)?.parentId ?? undefined;
-          }
-          const target = p.folders.find((f) => f.id === folderId);
-          const sameParent = target && target.parentId === moving.parentId;
-          const descendants = new Set([moving.id]);
-          let added = true;
-          while (added) {
-            added = false;
-            p.folders.forEach((f) => {
-              if (
-                f.parentId &&
-                descendants.has(f.parentId) &&
-                !descendants.has(f.id)
-              ) {
-                descendants.add(f.id);
-                added = true;
-              }
-            });
-          }
+          const conf: SupplierSetting = {
+            bookmarkId: chosenSite || stableId("supplier-site|" + name),
+            method:
+              method === "문자" || method === "카카오톡"
+                ? "카카오톡·문자"
+                : (method as SupplierSetting["method"]),
+            methods: [method, ...(extra ? [extra] : [])],
+            memo,
+            phone,
+          };
+          const previous = p.suppliers[name]?.bookmarkId;
+          if (!onlyProduct && previous && previous !== conf.bookmarkId)
+            throw Error(
+              "기존 연결을 유지하세요. 상품별 예외 주문처는 ‘이 상품만 적용’을 선택하여 지정할 수 있습니다.",
+            );
+          const productSuppliers = { ...p.productSuppliers };
+          if (!onlyProduct && product)
+            delete productSuppliers[product.baseId + "|" + name];
+          const existing = p.bookmarks.find((b) => b.id === conf.bookmarkId);
+          let folders = p.folders;
+          const folderId =
+            existing?.folderId ?? p.folders[0]?.id ?? "order-default";
+          if (!folders.length)
+            folders = [
+              {
+                id: folderId,
+                name: "주문처",
+                parentId: null,
+                category: "종합도매",
+                order: 0,
+              },
+            ];
+          const site: Bookmark = {
+            ...existing,
+            id: conf.bookmarkId!,
+            title: existing?.title ?? name,
+            url: url || "",
+            folderId,
+            category: existing?.category ?? "종합도매",
+            memo,
+            phone,
+            methods: conf.methods,
+            supplierNames: [
+              ...new Set([...(existing?.supplierNames ?? []), name]),
+            ],
+          };
           return {
             ...p,
-            folders: p.folders.map((f) =>
-              f.id === moving.id
-                ? {
-                    ...f,
-                    parentId: sameParent ? moving.parentId : (folderId ?? null),
-                    order: sameParent ? target!.order - 0.5 : Date.now(),
-                    category,
-                  }
-                : descendants.has(f.id)
-                  ? { ...f, category }
-                  : f,
-            ),
-            bookmarks: p.bookmarks.map((b) =>
-              descendants.has(b.folderId) ? { ...b, category } : b,
-            ),
+            folders,
+            bookmarks: existing
+              ? p.bookmarks.map((b) => (b.id === existing.id ? site : b))
+              : [...p.bookmarks, site],
+            ...(onlyProduct && product
+              ? {
+                  productSuppliers: {
+                    ...p.productSuppliers,
+                    [product.baseId + "|" + name]: conf,
+                  },
+                }
+              : {
+                  productSuppliers,
+                  suppliers: { ...p.suppliers, [name]: conf },
+                }),
           };
         }),
-      );
-    } catch (err) {
-      data.setError(
-        err instanceof Error ? err.message : "이동하지 못했습니다.",
-      );
-    }
-  }
-  function renderFolder(
-    f: BookmarkFolder,
-    category: string,
-    depth = 0,
-  ): React.ReactNode {
-    if (depth > 32) return null;
-    const links = visible
-      .filter((b) => b.folderId === f.id && b.category === category)
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    const children = preferences.folders
-      .filter((x) => x.parentId === f.id)
-      .sort((a, b) => a.order - b.order)
-      .map((x) => renderFolder(x, category, depth + 1))
-      .filter(Boolean);
-    if (!links.length && !children.length) return null;
-    const content = (
-      <>
-        {links.map((b) => (
-          <div
-            className="order-tree-link"
-            key={b.id}
-            draggable
-            onDragStart={(e) => dragStart(e, "bookmark", b.id)}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => drop(e, category, f.id, b.id)}
-          >
-            <button onClick={() => open(b)} title={b.memo || b.title}>
-              {b.title}
-            </button>
-            <button
-              className="order-tree-star"
-              aria-label={`${b.title} ${b.rank !== undefined ? "고정 해제" : "고정"}`}
-              onClick={() => pin(b)}
-            >
-              <Star
-                size={12}
-                fill={b.rank !== undefined ? "currentColor" : "none"}
-              />
-            </button>
-          </div>
-        ))}
-        {children}
-      </>
-    );
-    return f.name === "북마크바" ? (
-      <div key={f.id}>{content}</div>
-    ) : (
-      <details
-        key={f.id}
-        className="order-tree-folder"
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => drop(e, category, f.id)}
-      >
-        <summary draggable onDragStart={(e) => dragStart(e, "folder", f.id)}>
-          <Folder size={13} />
-          {f.name}
-        </summary>
-        {content}
-      </details>
-    );
-  }
-  async function match(p: Product, code: string) {
-    if (!snapshot) return;
-    const candidates = snapshot.catalogs.filter((c) => c.code === code);
-    if (!candidates.length) throw new Error("연결할 상품을 찾지 못했습니다.");
-    const products = snapshot.products.filter((x) => x.baseId !== p.baseId);
-    for (const c of candidates) {
-      if (products.some((x) => x.baseId === p.baseId && x.usage === c.usage))
-        continue;
-      products.push({
-        ...p,
-        id: `${p.baseId}-${c.usage}`,
-        name: c.name,
-        code: c.code,
-        usage: c.usage,
-        matchStatus: "matched",
-        candidateCodes: [],
-      });
-    }
-    await data.saveSnapshot(
-      {
-        ...snapshot,
-        previousVersion: snapshot.version,
-        products,
-        version: crypto.randomUUID(),
-      },
-      { baseId: p.baseId, code },
-    );
-    setSelectedId(`${p.baseId}-${candidates[0].usage}`);
-  }
-  const manageLinks = preferences.bookmarks
-    .filter((b) =>
-      trash
-        ? !!b.deletedAt && Date.now() - Date.parse(b.deletedAt) <= 30 * 86400000
-        : !b.deletedAt,
+      )
     )
-    .filter((b) =>
-      normalizeName(`${b.title} ${b.category}`).includes(
-        normalizeName(manageQuery),
-      ),
-    );
+      close();
+  }
+  async function createProduct() {
+    const name = field.trim();
+    if (!name) {
+      setNotice("상품명을 입력하세요.");
+      return;
+    }
+    const baseId = stableId("manual|" + normalizeName(name));
+    const p: Product = {
+      id: baseId + "-" + newUsage,
+      baseId,
+      name,
+      sourceName: name,
+      manufacturer: "",
+      usage: newUsage,
+      matchStatus: "unclassified",
+      latest: [],
+      frequency: [],
+      manualSupplier: memo.trim(),
+    };
+    const empty: Snapshot = {
+      version: "",
+      asOf: todayKorea(),
+      products: [],
+      catalogs: [],
+      stats: {
+        rows: 0,
+        names: 0,
+        matchedRows: 0,
+        unclassifiedRows: 0,
+        reviewRows: 0,
+        futureRows: 0,
+        returnRows: 0,
+        missingNames: 0,
+      },
+      importedAt: new Date().toISOString(),
+    };
+    const previous = snapshot ?? empty;
+    if (
+      await run(() =>
+        data.saveSnapshot({
+          ...previous,
+          previousVersion: previous.version || undefined,
+          version: crypto.randomUUID(),
+          products: [
+            ...previous.products.filter((x) => x.baseId !== baseId),
+            p,
+          ],
+        }),
+      )
+    ) {
+      setDialog(null);
+      search(name);
+    }
+  }
+  async function classify(p: Product, code: string) {
+    if (!snapshot) return;
+    const matches = snapshot.catalogs.filter((c) => c.code === code);
+    if (!matches.length) {
+      setNotice("등록된 약품코드를 선택하세요.");
+      return;
+    }
+    const next = snapshot.products.filter((x) => x.baseId !== p.baseId);
+    for (const c of matches)
+      if (!next.some((x) => x.baseId === p.baseId && x.usage === c.usage))
+        next.push({
+          ...p,
+          id: p.baseId + "-" + c.usage,
+          name: c.name,
+          code: c.code,
+          usage: c.usage,
+          matchStatus: "matched",
+          candidateCodes: [],
+        });
+    if (
+      await run(() =>
+        data.saveSnapshot(
+          {
+            ...snapshot,
+            previousVersion: snapshot.version,
+            version: crypto.randomUUID(),
+            products: next,
+          },
+          { baseId: p.baseId, code },
+        ),
+      )
+    )
+      setDialog(null);
+  }
   return (
-    <div className={`order-shell ${collapsed ? "closed" : ""}`}>
-      <aside className="order-sidebar">
-        <div className="order-sidebar-brand">
-          <strong>센트럴온누리</strong>
+    <div ref={appRoot} className={"of-app of-font-" + font}>
+      <header className="of-top">
+        <strong>센트럴온누리약국</strong>
+        <TopNavigation active="order" onNavigate={onNavigate} />
+      </header>
+      <div className="of-layout">
+        <aside className="of-sidebar">
+          <h2>즐겨찾기 폴더</h2>
           <button
-            className="order-quiet"
-            aria-label={collapsed ? "즐겨찾기 펼치기" : "즐겨찾기 접기"}
-            onClick={() => {
-              setCollapsed((v) => !v);
-              try {
-                localStorage.setItem(
-                  "cenon-bookmark-sidebar",
-                  collapsed ? "open" : "closed",
-                );
-              } catch {}
-            }}
+            className="of-edit-button"
+            onClick={() => edit({ kind: "favorites" })}
           >
-            <Menu size={18} />
+            즐겨찾기 편집
           </button>
-        </div>
-        {!collapsed && (
-          <>
-            <div className="order-sidebar-label">
-              즐겨찾기 <span>{visible.length}</span>
-            </div>
-            <div className="order-tree">
-              {CATEGORIES.map((category) => (
-                <details
-                  key={category}
-                  open={category === "종합도매"}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => drop(e, category)}
-                >
-                  <summary>
-                    <Folder size={15} />
-                    {category}
-                    <small>
-                      {visible.filter((b) => b.category === category).length}
-                    </small>
-                  </summary>
-                  {preferences.folders
-                    .filter(
-                      (f) =>
-                        !f.parentId ||
-                        !preferences.folders.some((x) => x.id === f.parentId),
-                    )
-                    .sort((a, b) => a.order - b.order)
-                    .map((f) => renderFolder(f, category))}
-                </details>
-              ))}
-              {!visible.length && (
-                <p className="order-help">
-                  업무용 북마크를 가져오면 여기에서 찾을 수 있습니다.
-                </p>
-              )}
-            </div>
-            <button
-              className="order-sidebar-import"
-              onClick={() => setModal("bookmarks")}
-            >
-              <Upload size={15} /> 북마크 가져오기
-            </button>
-            <small className="order-sidebar-foot">
-              {data.shared ? "약국 공용으로 저장" : "이 PC에 저장"} ·
-              폴더·링크를 끌어 이동
-            </small>
-          </>
-        )}
-      </aside>
-      <main className="order-main">
-        <header className="order-topbar">
-          <TopNavigation active="order" onNavigate={onNavigate} />
-          <button
-            className="order-quiet order-manage-button"
-            onClick={() => setModal("manage")}
-          >
-            <Settings2 size={17} /> 관리
-          </button>
-        </header>
-        <div className="order-content">
-          {data.error && (
-            <div className="order-error" role="alert">
-              {data.error}
-              <button
-                onClick={() => data.setError("")}
-                aria-label="오류 안내 닫기"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-          {notice && (
-            <div className="order-notice" role="status">
-              {notice}
-              <button onClick={() => setNotice("")} aria-label="안내 닫기">
-                ✕
-              </button>
-            </div>
-          )}
-          <div className="order-search-heading">
+          <FolderTree preferences={prefs} onOpen={openSite} />
+        </aside>
+        <main className="of-main">
+          <div className="of-heading">
+            <h1>주문·업무 찾기</h1>
             <div>
-              <h1>주문·업무 찾기</h1>
-              <p>상품과 주문처, 필요한 업무를 한 번에 찾으세요.</p>
-            </div>
-            <button
-              className="order-secondary"
-              onClick={() => setModal("purchase")}
-            >
-              <Upload size={15} /> 매입자료 갱신
-            </button>
-          </div>
-          <div className="order-search-box">
-            <Search size={20} />
-            <input
-              aria-label="상품 거래처 업무 검색"
-              placeholder="약품 / 거래처 / 업무 / 소모품 검색"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setSelectedId("");
-              }}
-            />
-            <kbd>검색</kbd>
-            {query && (
+              <small>매입 자료: {snapshot?.asOf ?? "미등록"} 기준</small>
               <button
                 onClick={() => {
-                  setQuery("");
-                  setSelectedId("");
+                  setScope(null);
+                  setPending("");
+                  search("");
                 }}
-                aria-label="검색 지우기"
               >
-                ✕
+                처음으로
+              </button>
+              <button onClick={() => edit({ kind: "manage" })}>관리</button>
+            </div>
+          </div>
+          <div className="of-search">
+            {scope && (
+              <button
+                className="of-scope"
+                title={scope.name + " 범위 해제"}
+                onClick={() => {
+                  setScope(null);
+                  setUsage("all");
+                  setSort("recent");
+                }}
+              >
+                {scope.name} ×
               </button>
             )}
+            <input
+              ref={input}
+              aria-label="상품·거래처·바코드 검색"
+              placeholder="상품명 일부 / 거래처 / 바코드 / 약품코드"
+              value={query}
+              onChange={(e) => search(e.target.value)}
+            />
+            {query && (
+              <button
+                aria-label="검색어 지우기"
+                onClick={() => {
+                  search("");
+                  setPending("");
+                  focus();
+                }}
+              >
+                ×
+              </button>
+            )}
+            <button
+              className="of-scan"
+              aria-label="바코드 촬영"
+              title="바코드 촬영"
+              onClick={() => edit({ kind: "camera" })}
+            >
+              <ScanBarcode size={21} />
+            </button>
+            <kbd>Ctrl K</kbd>
           </div>
-          {!query.trim() ? (
+          {pending && (
+            <div className="of-pending">
+              미등록 바코드: {pending} · 상품명으로 찾은 뒤 연결하세요.
+              <button onClick={() => setPending("")}>연결 취소</button>
+            </div>
+          )}
+          {(data.error || notice) && (
+            <p
+              className={data.error ? "of-error" : "of-notice"}
+              role={data.error ? "alert" : "status"}
+            >
+              {data.error || notice}
+            </p>
+          )}
+          {!query && !scope ? (
             <>
-              <section className="order-shortcuts">
-                <h2>
-                  <Star size={16} /> 고정 즐겨찾기{" "}
-                  <small>{hot.fixed.length}/10</small>
-                </h2>
-                <div className="order-shortcut-grid">
-                  {hot.fixed.map((b) => (
-                    <button
-                      key={b.id}
-                      className="order-shortcut"
-                      onClick={() => open(b)}
-                      title={b.memo}
-                    >
-                      {b.title}
-                      <ExternalLink size={12} />
-                    </button>
-                  ))}
-                  {!hot.fixed.length && (
-                    <p className="order-help">
-                      즐겨찾기 옆 별을 눌러 자주 쓰는 사이트를 고정하세요.
-                    </p>
-                  )}
-                </div>
-              </section>
-              <section className="order-shortcuts">
-                <h2>
-                  자주 사용{" "}
-                  <small>
-                    최근 30일 · {data.shared ? "약국 전체" : "이 PC"} 상위 5개
-                  </small>
-                </h2>
-                <div className="order-shortcut-grid automatic">
-                  {hot.frequent.map((b) => (
-                    <button
-                      key={b.id}
-                      className="order-shortcut"
-                      onClick={() => open(b)}
-                    >
-                      {b.title}
-                      <ExternalLink size={12} />
-                    </button>
-                  ))}
-                  {!hot.frequent.length && (
-                    <p className="order-help">
-                      고정 사이트를 제외하고, 사용 기록이 쌓이면 자동으로
-                      표시됩니다.
-                    </p>
-                  )}
-                </div>
-              </section>
-              <div className="order-category-grid">
-                {CATEGORIES.map((category) => (
-                  <section key={category}>
-                    <h2>{category}</h2>
-                    {visible
-                      .filter((b) => b.category === category)
-                      .slice(0, 3)
-                      .map((b) => (
-                        <button key={b.id} onClick={() => open(b)}>
-                          {b.title}
-                          <ExternalLink size={12} />
-                        </button>
-                      ))}
-                    {!visible.some((b) => b.category === category) && (
-                      <p className="order-help">등록된 사이트가 없습니다.</p>
-                    )}
-                    <button
-                      className="order-category-more"
-                      onClick={() => {
-                        setManageQuery(category);
-                        setTrash(false);
-                        setModal("manage");
-                      }}
-                    >
-                      전체보기
-                    </button>
-                  </section>
-                ))}
-              </div>
-              {!snapshot && !data.loading && (
-                <div className="order-empty-import">
-                  <strong>
-                    매입자료를 가져오면 상품별 주문처를 찾을 수 있습니다.
-                  </strong>
-                  <p>
-                    분류되지 않은 품목도 바로 검색됩니다. 적수는 필요한 상품만
-                    입력하세요.
-                  </p>
-                  <button
-                    className="order-primary"
-                    onClick={() => setModal("purchase")}
-                  >
-                    매입자료 가져오기
+              <section>
+                <div className="of-section-heading">
+                  <h2>고정 즐겨찾기</h2>
+                  <button onClick={() => edit({ kind: "favorites" })}>
+                    편집
                   </button>
                 </div>
+                <div className="of-home-sites">
+                  {hot.fixed.map((b) => (
+                    <button key={b.id} onClick={() => openSite(b)}>
+                      {b.title} ↗
+                    </button>
+                  ))}
+                </div>
+                {!hot.fixed.length && (
+                  <p className="of-muted">
+                    즐겨찾기 편집에서 ☆를 눌러 고정할 수 있습니다.
+                  </p>
+                )}
+                {hot.frequent.length > 0 && (
+                  <>
+                    <h2>자주 쓰는 사이트</h2>
+                    <div className="of-home-sites">
+                      {hot.frequent.map((b) => (
+                        <button key={b.id} onClick={() => openSite(b)}>
+                          {b.title} ↗
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </section>
+              <h2>업무 사이트</h2>
+              <div className="of-directory">
+                {prefs.folders.map((f) => {
+                  const links = active.filter((b) => b.folderId === f.id);
+                  return links.length ? (
+                    <section key={f.id}>
+                      <h3>{f.name}</h3>
+                      <div>
+                        {links.map((b) => (
+                          <button key={b.id} onClick={() => openSite(b)}>
+                            {b.title} ↗
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null;
+                })}
+              </div>
+              {!snapshot && (
+                <p>
+                  <button onClick={() => edit({ kind: "purchase" })}>
+                    매입 자료 가져오기
+                  </button>
+                </p>
               )}
             </>
           ) : (
-            <div
-              className={`order-results-grid ${selected ? "has-detail" : ""}`}
-            >
-              <div className="order-results">
-                <div className="order-result-header">
-                  <h2>
-                    {found.suggested ? "비슷한 상품을 찾았습니다" : "상품"}{" "}
-                    <small>
-                      {found.results.length === 80
-                        ? "80개 이상"
-                        : `${found.results.length}개`}
-                    </small>
-                  </h2>
-                  <select
-                    aria-label="상품 용도 필터"
-                    value={usage}
-                    onChange={(e) => setUsage(e.target.value)}
-                  >
-                    <option value="all">모두</option>
-                    <option value="dispensing">조제용</option>
-                    <option value="retail">판매용</option>
-                    <option value="unclassified">미분류</option>
-                  </select>
-                </div>
-                {found.suggested && (
-                  <p className="order-help">
-                    상품명과 규격을 확인하고 선택해 주세요.
-                  </p>
-                )}
-                {found.results
-                  .filter((p) => usage === "all" || p.usage === usage)
-                  .map((p) => (
-                    <button
-                      key={p.id}
-                      className={`order-product-row ${p.id === selectedId ? "selected" : ""}`}
-                      onClick={() => setSelectedId(p.id)}
+            <>
+              {!scope && supplierCandidates.length > 0 && (
+                <>
+                  <h2>거래처 · {supplierCandidates.length}곳</h2>
+                  {supplierCandidates.map((name) => (
+                    <div
+                      className="of-supplier-card"
+                      key={name}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => selectScope(name, [name])}
+                      onKeyDown={(e) => {
+                        if (e.target !== e.currentTarget) return;
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          selectScope(name, [name]);
+                        }
+                      }}
                     >
-                      <span>
-                        <strong>{p.name}</strong>
+                      <div>
+                        <strong>{name}</strong>
                         <small>
-                          {p.manufacturer}
-                          {p.matchStatus === "review"
-                            ? " · 연결 확인 필요"
-                            : ""}
+                          연결 품목{" "}
+                          {
+                            (snapshot?.products ?? [])
+                              .filter(
+                                (p) =>
+                                  supplierRows(p).some(
+                                    (r) => r.supplier === name,
+                                  ) || p.manualSupplier === name,
+                              )
+                              .reduce(
+                                (s, p) => s.add(p.baseId),
+                                new Set<string>(),
+                              ).size
+                          }
+                          개
                         </small>
-                      </span>
-                      <span className={`order-badge ${p.usage}`}>
-                        {usageLabel[p.usage]}
-                      </span>
-                    </button>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const link =
+                            active.find(
+                              (b) => b.id === prefs.suppliers[name]?.bookmarkId,
+                            ) ?? active.find((b) => b.title === name);
+                          if (link) openSite(link);
+                          else edit({ kind: "supplier", supplier: name });
+                        }}
+                      >
+                        사이트 열기 ↗
+                      </button>
+                    </div>
                   ))}
-                {!found.results.length && (
-                  <p className="order-help">
-                    검색되는 상품이 없습니다. 상품명 일부나 거래처명으로 다시
-                    검색해 보세요.
-                  </p>
-                )}
-                <button
-                  className="order-quiet"
-                  onClick={() => setModal("newProduct")}
-                >
-                  <Plus size={14} /> 주문처 직접 등록
-                </button>
-                <h2 className="order-link-results-heading">
-                  업무·즐겨찾기 <small>{bookmarkResults.length}개</small>
-                </h2>
-                {bookmarkResults.map((b) => (
-                  <button
-                    className="order-bookmark-result"
-                    key={b.id}
-                    onClick={() => open(b)}
-                  >
-                    <span>
-                      <strong>{b.title}</strong>
-                      <small>{b.memo || b.category}</small>
-                    </span>
-                    <ExternalLink size={15} />
-                  </button>
-                ))}
-              </div>
-              {selected && snapshot && (
-                <ProductPanel
-                  key={selected.id}
-                  product={selected}
-                  snapshot={snapshot}
-                  preferences={preferences}
-                  onClose={() => setSelectedId("")}
-                  onOpen={open}
-                  onUnit={(id, value) =>
-                    data.change((p) => ({
-                      ...p,
-                      units: { ...p.units, [id]: value },
-                    }))
-                  }
-                  onSupplier={(name, value) =>
-                    data.change((p) => ({
-                      ...p,
-                      suppliers: { ...p.suppliers, [name]: value },
-                    }))
-                  }
-                  onMatch={match}
-                />
+                </>
               )}
-            </div>
+              {scope && (
+                <div className="of-supplier-card">
+                  <div>
+                    <strong>{scope.name}</strong>
+                    <small>연결된 전체 품목 · 과거 매입 이력 포함</small>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const link =
+                        active.find((b) => b.title === scope.name) ??
+                        active.find(
+                          (b) =>
+                            b.id ===
+                            prefs.suppliers[scope.names[0]]?.bookmarkId,
+                        );
+                      if (link) openSite(link);
+                      else edit({ kind: "supplier", supplier: scope.names[0] });
+                    }}
+                  >
+                    사이트 열기 ↗
+                  </button>
+                </div>
+              )}
+              <div className="of-result-heading">
+                <h2>
+                  {context.length
+                    ? "연결 품목"
+                    : nameMatches.suggested &&
+                        !supplierCandidates.length &&
+                        !siteCandidates.length
+                      ? "비슷한 이름 후보"
+                      : "상품"}{" "}
+                  · {found.length.toLocaleString()}개
+                </h2>
+                {context.length > 0 && (
+                  <div className="of-sort">
+                    {[
+                      ["recent", "최근 매입순"],
+                      ["name", "가나다순"],
+                      ["count", "매입 기록 많은 순"],
+                    ].map(([id, label]) => (
+                      <button
+                        key={id}
+                        className={sort === id ? "selected" : ""}
+                        onClick={() => setSort(id)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <select
+                  aria-label="상품 용도"
+                  value={usage}
+                  onChange={(e) => setUsage(e.target.value as Usage | "all")}
+                >
+                  <option value="all">전체</option>
+                  <option value="dispensing">조제</option>
+                  <option value="retail">판매</option>
+                  <option value="unclassified">미분류</option>
+                </select>
+              </div>
+              <p className="of-muted">
+                상품명을 누르면 거래처·가격이 펼쳐집니다.
+              </p>
+              {found.map((p) => (
+                <SearchCard
+                  key={p.baseId}
+                  product={p}
+                  preferences={prefs}
+                  scope={context}
+                  expanded={
+                    open.has(p.baseId) ||
+                    (found.length === 1 && !closed.has(p.baseId))
+                  }
+                  toggle={() =>
+                    setOpen((previous) => {
+                      const next = new Set(previous);
+                      if (
+                        next.has(p.baseId) ||
+                        (found.length === 1 && !closed.has(p.baseId))
+                      ) {
+                        next.delete(p.baseId);
+                        setClosed((v) => new Set([...v, p.baseId]));
+                      } else {
+                        next.add(p.baseId);
+                        setClosed(
+                          (v) =>
+                            new Set([...v].filter((id) => id !== p.baseId)),
+                        );
+                      }
+                      return next;
+                    })
+                  }
+                  asOf={snapshot?.asOf ?? todayKorea()}
+                  pending={pending}
+                  onOrder={order}
+                  onScopeOrder={(p, name) =>
+                    context.length > 1
+                      ? edit({ kind: "mall", p })
+                      : order(p, name)
+                  }
+                  onSupplier={(p, supplier) =>
+                    edit({ kind: "supplier", p, supplier })
+                  }
+                  onSearchName={(p) => edit({ kind: "short", p })}
+                  onUnit={(p) => edit({ kind: "unit", p })}
+                  onBarcode={(p) => edit({ kind: "barcode", p })}
+                  onClassify={(p) => {
+                    edit({ kind: "classify", p });
+                    setField(p.code ?? "");
+                  }}
+                />
+              ))}
+              {!found.length && !supplierCandidates.length && (
+                <div className="of-empty">
+                  검색 결과가 없습니다.
+                  {scope && query && (
+                    <button
+                      onClick={() => {
+                        setScope(null);
+                        setUsage("all");
+                      }}
+                    >
+                      전체 거래처에서 검색
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setMemo("");
+                      edit({ kind: "new" });
+                    }}
+                  >
+                    + 새 상품 등록
+                  </button>
+                </div>
+              )}
+              {!scope && siteCandidates.length > 0 && (
+                <>
+                  <h2>업무 사이트</h2>
+                  {siteCandidates.map((b) => (
+                    <div className="of-supplier-card" key={b.id}>
+                      <button onClick={() => openSite(b)}>{b.title} ↗</button>
+                      {namesForSite(b).length > 0 && (
+                        <button
+                          onClick={() => selectScope(b.title, namesForSite(b))}
+                        >
+                          연결 품목 보기
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
+            </>
           )}
-          <footer className="order-data-foot">
+          <footer>
             {data.loading
               ? "자료를 불러오는 중…"
-              : snapshot
-                ? `매입 ${snapshot.stats.rows.toLocaleString()}행 · 자료 기준 ${snapshot.asOf} · ${data.shared ? "약국 공용" : "이 PC에 저장"}`
-                : `${data.shared ? "약국 공용" : "이 PC에 저장"} · 업무용 북마크부터 가져올 수 있습니다.`}
+              : data.shared
+                ? "약국 공용 자료"
+                : "이 기기에 저장"}{" "}
+            ·{" "}
+            {snapshot
+              ? `매입 ${snapshot.stats.rows.toLocaleString()}행 · 할인/할증 보정 없음`
+              : "자료를 가져오면 상품 검색을 사용할 수 있습니다."}
           </footer>
-        </div>
-      </main>
-      {modal === "purchase" && (
+        </main>
+      </div>
+      {top && !dialog && (
+        <button
+          className="of-back-top"
+          aria-label="맨 위로 이동"
+          title="맨 위로"
+          onClick={() =>
+            window.scrollTo({
+              top: 0,
+              behavior: window.matchMedia("(prefers-reduced-motion: reduce)")
+                .matches
+                ? "instant"
+                : "smooth",
+            })
+          }
+        >
+          <ArrowUp size={22} />
+        </button>
+      )}
+      {dialog?.kind === "favorites" && (
+        <Favorites
+          preferences={prefs}
+          change={data.change}
+          suppliers={suppliers}
+          notify={setNotice}
+          onClose={close}
+        />
+      )}
+      {dialog?.kind === "purchase" && (
         <PurchaseImport
           previous={snapshot}
-          preferences={preferences}
+          preferences={prefs}
           onSave={data.saveSnapshot}
-          onClose={() => setModal(null)}
+          onClose={close}
         />
-      )}{" "}
-      {modal === "bookmarks" && (
-        <BookmarkImport
-          onClose={() => setModal(null)}
-          onSave={async (f, b) => {
-            await data.change((p) => {
-              const urls = new Set(
-                p.bookmarks.filter((x) => !x.deletedAt).map((x) => x.url),
-              );
-              const added = b.filter((x) => !urls.has(x.url));
-              const allFolders = [
-                ...p.folders,
-                ...f.filter((x) => !p.folders.some((y) => y.id === x.id)),
-              ];
-              return {
-                ...p,
-                folders: allFolders,
-                bookmarks: [...p.bookmarks, ...added],
-              };
-            });
-            setNotice(
-              "선택한 업무용 북마크를 가져왔습니다. 기존 URL은 그대로 유지했습니다.",
-            );
+      )}
+      {dialog?.kind === "camera" && (
+        <BarcodeCamera
+          onScan={scan}
+          onClose={close}
+          onName={() => {
+            setDialog(null);
+            setPending("");
+            setScope(null);
+            search("");
+            focus();
           }}
         />
       )}
-      {modal === "manage" && (
-        <Modal title="주문·업무 관리" onClose={() => setModal(null)}>
-          <div className="order-management-actions">
-            <button
-              className="order-secondary"
-              onClick={() => setModal("purchase")}
-            >
-              매입자료 갱신
+      {dialog?.kind === "manage" && (
+        <Modal title="관리 · 직원 누구나 수정" onClose={close}>
+          <div className="of-actions">
+            <button onClick={() => edit({ kind: "favorites", from: "manage" })}>
+              즐겨찾기 편집·가져오기
+            </button>
+            <button onClick={() => edit({ kind: "purchase", from: "manage" })}>
+              매입 자료 갱신
             </button>
             <button
-              className="order-secondary"
-              onClick={() => setModal("bookmarks")}
+              onClick={() => {
+                setMemo("");
+                edit({ kind: "new", from: "manage" });
+              }}
             >
-              북마크 가져오기
+              새 상품 등록
             </button>
-            <button className="order-secondary" onClick={() => setEditor({})}>
-              즐겨찾기 추가
+            <button
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  const old = await readCache<Snapshot>("previousSnapshot");
+                  if (!old) throw Error("복원할 직전 자료가 없습니다.");
+                  if (
+                    !window.confirm(
+                      "매입 자료를 직전 자료로 복원할까요? 즐겨찾기·바코드 설정은 유지됩니다.",
+                    )
+                  )
+                    return;
+                  await data.saveSnapshot({
+                    ...old,
+                    previousVersion: snapshot?.version,
+                    version: crypto.randomUUID(),
+                  });
+                  setNotice("직전 매입 자료를 복원했습니다.");
+                })
+              }
+            >
+              직전 자료 복원
             </button>
           </div>
-          <div className="order-manage-filter">
-            <input
-              aria-label="관리할 즐겨찾기 검색"
-              placeholder="사이트 이름 또는 분류"
-              value={manageQuery}
-              onChange={(e) => setManageQuery(e.target.value)}
-            />
-            <button
-              className="order-secondary"
-              onClick={() => setTrash((t) => !t)}
-            >
-              {trash ? "전체 즐겨찾기" : "휴지통 (30일)"}
-            </button>
+          <p>모바일 글자 크기 · 이 기기만 적용</p>
+          <div className="of-actions">
+            {[
+              ["small", "작게"],
+              ["default", "기본"],
+              ["large", "크게"],
+            ].map(([id, label]) => (
+              <button
+                key={id}
+                className={font === id ? "selected" : ""}
+                onClick={() => {
+                  setFont(id);
+                  try {
+                    localStorage.setItem("order-mobile-font", id);
+                  } catch {}
+                }}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-          <div className="order-manage-list">
-            {manageLinks.map((b) => (
-              <div key={b.id}>
-                <span>
-                  <strong>{b.title}</strong>
-                  <small>
-                    {b.category} · {b.memo || new URL(b.url).hostname}
-                  </small>
-                </span>
-                {trash ? (
-                  <button
-                    className="order-secondary"
-                    onClick={() =>
-                      void perform(() =>
-                        data.change((p) => ({
-                          ...p,
-                          bookmarks: p.bookmarks.map((x) =>
-                            x.id === b.id ? restored(x) : x,
-                          ),
-                        })),
-                      )
-                    }
-                  >
-                    복원
-                  </button>
-                ) : (
+          <p className="of-muted">자료 갱신: 분기 1회 · 월 1회 목표</p>
+        </Modal>
+      )}
+      {dialog &&
+        [
+          "short",
+          "unit",
+          "barcode",
+          "supplier",
+          "contact",
+          "new",
+          "classify",
+          "mall",
+        ].includes(dialog.kind) && (
+          <Modal
+            title={
+              {
+                short: "주문 사이트 검색명",
+                unit: "매입 단위 확인",
+                barcode: "바코드 연결 관리",
+                supplier: "주소·주문 방법",
+                contact: "주문 연락처",
+                new: "새 상품 등록",
+                classify: "약품코드 연결",
+                mall: "주문할 거래처 선택",
+              }[dialog.kind as "short"]
+            }
+            onClose={close}
+          >
+            {notice && <p role="status">{notice}</p>}
+            {dialog.kind === "mall" && dialog.p && (
+              <div className="of-actions">
+                {supplierRows(dialog.p)
+                  .filter((r) => context.includes(r.supplier))
+                  .map((r) => {
+                    const v = displayPrice(
+                      r,
+                      prefs.units[dialog.p!.baseId],
+                      dialog.p!.usage,
+                    );
+                    return (
+                      <button
+                        key={r.supplier}
+                        onClick={() => {
+                          setDialog(null);
+                          order(dialog.p!, r.supplier);
+                        }}
+                      >
+                        {r.supplier} · {v.amount.toLocaleString()}원 / {v.unit}{" "}
+                        · {r.date}
+                      </button>
+                    );
+                  })}
+              </div>
+            )}
+            {dialog.kind === "short" && (
+              <>
+                <p>{dialog.p?.name}</p>
+                <input
+                  aria-label="복사할 짧은 검색명"
+                  value={field}
+                  onChange={(e) => setField(e.target.value)}
+                />
+                <button
+                  disabled={busy || !field.trim()}
+                  onClick={() =>
+                    void run(async () => {
+                      await data.change((p) => ({
+                        ...p,
+                        searchNames: {
+                          ...p.searchNames,
+                          [dialog.p!.baseId]: field.trim(),
+                        },
+                      }));
+                      close();
+                    })
+                  }
+                >
+                  저장
+                </button>
+              </>
+            )}
+            {dialog.kind === "unit" && (
+              <>
+                <p className="of-muted">
+                  확인한 단위만 입력하세요. 미확인 단가는 추정하지 않습니다.
+                </p>
+                <label>
+                  기본 매입 단위
+                  <input
+                    value={baseUnit}
+                    onChange={(e) => setBaseUnit(e.target.value)}
+                  />
+                </label>
+                {dialog.p?.usage !== "dispensing" && (
                   <>
-                    <button
-                      className="order-quiet"
-                      onClick={() => pin(b)}
-                      aria-label={`${b.title} 고정 설정`}
-                    >
-                      <Star
-                        size={15}
-                        fill={b.rank !== undefined ? "currentColor" : "none"}
+                    <label>
+                      포장 안 기본 단위 수
+                      <input
+                        type="number"
+                        min="1"
+                        value={count}
+                        onChange={(e) => setCount(e.target.value)}
                       />
-                    </button>
+                    </label>
+                    <label>
+                      판매 포장 단위
+                      <input
+                        value={packUnit}
+                        onChange={(e) => setPackUnit(e.target.value)}
+                      />
+                    </label>
+                  </>
+                )}
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      const n =
+                        dialog.p?.usage === "dispensing" ? 1 : Number(count);
+                      if (!baseUnit.trim() || !Number.isFinite(n) || n <= 0)
+                        throw Error("기본 단위와 수량을 확인하세요.");
+                      await data.change((p) => ({
+                        ...p,
+                        units: {
+                          ...p.units,
+                          [dialog.p!.baseId]: {
+                            count: n,
+                            baseUnit: baseUnit.trim(),
+                            packUnit: packUnit.trim() || baseUnit,
+                            quantityBasis: "base",
+                          },
+                        },
+                      }));
+                      close();
+                    })
+                  }
+                >
+                  확인하여 저장
+                </button>
+              </>
+            )}
+            {dialog.kind === "barcode" && (
+              <>
+                <strong>{dialog.p?.name}</strong>
+                <p className="of-muted">{dialog.p?.manufacturer}</p>
+                {(prefs.barcodes?.[dialog.p!.baseId] ?? []).map((code) => (
+                  <div className="of-actions" key={code}>
+                    <span>{code}</span>
                     <button
-                      className="order-secondary"
-                      onClick={() => setEditor({ bookmark: b })}
-                    >
-                      수정
-                    </button>
-                    <button
-                      className="order-quiet"
                       onClick={() =>
-                        void perform(() =>
+                        void run(() =>
                           data.change((p) => ({
                             ...p,
-                            bookmarks: p.bookmarks.map((x) =>
-                              x.id === b.id
-                                ? {
-                                    ...withoutRank(x),
-                                    deletedAt: new Date().toISOString(),
-                                  }
-                                : x,
-                            ),
+                            barcodes: {
+                              ...p.barcodes,
+                              [dialog.p!.baseId]: (
+                                p.barcodes?.[dialog.p!.baseId] ?? []
+                              ).filter((c) => c !== code),
+                            },
                           })),
                         )
                       }
                     >
-                      삭제
+                      해제
                     </button>
-                  </>
+                  </div>
+                ))}
+                <label>
+                  연결할 바코드
+                  <input
+                    inputMode="numeric"
+                    value={field}
+                    onChange={(e) => setField(e.target.value.trim())}
+                  />
+                </label>
+                <button
+                  disabled={busy || !field}
+                  onClick={() =>
+                    void run(async () => {
+                      if (!/^\d{8,14}$/.test(field))
+                        throw Error("8~14자리 바코드를 입력하세요.");
+                      const old = Object.entries(prefs.barcodes ?? {}).find(
+                        ([id, codes]) =>
+                          id !== dialog.p!.baseId && codes.includes(field),
+                      );
+                      if (
+                        old &&
+                        !window.confirm(
+                          "이 바코드는 " +
+                            (snapshot?.products.find((p) => p.baseId === old[0])
+                              ?.name ?? "다른 상품") +
+                            "에 연결되어 있습니다. 선택한 상품으로 옮길까요?",
+                        )
+                      )
+                        return;
+                      await data.change((p) =>
+                        barcodeLink(p, dialog.p!.baseId, field, !!old),
+                      );
+                      setPending("");
+                      close();
+                      setNotice("바코드를 연결했습니다.");
+                    })
+                  }
+                >
+                  이 상품에 연결
+                </button>
+              </>
+            )}
+            {dialog.kind === "supplier" && (
+              <>
+                <h3>{dialog.supplier}</h3>
+                <label>
+                  연결 사이트
+                  <select
+                    value={chosenSite}
+                    onChange={(e) => {
+                      setChosenSite(e.target.value);
+                      const site = active.find((b) => b.id === e.target.value);
+                      setAddress(site?.url ?? "");
+                      setPhone(site?.phone ?? "");
+                    }}
+                  >
+                    <option value="">새 주문처 등록</option>
+                    {active.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  공통 사이트 주소 · 비워도 등록
+                  <input
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                  />
+                </label>
+                <label>
+                  기본 주문 방법
+                  <select
+                    value={method}
+                    onChange={(e) => setMethod(e.target.value)}
+                  >
+                    {["사이트", "전화", "문자", "카카오톡"].map((n) => (
+                      <option key={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  추가 주문 방법
+                  <select
+                    value={extra}
+                    onChange={(e) => setExtra(e.target.value)}
+                  >
+                    <option value="">없음</option>
+                    {["사이트", "전화", "문자", "카카오톡"].map((n) => (
+                      <option key={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  전화번호
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </label>
+                <label>
+                  주문 메모
+                  <input
+                    value={memo}
+                    onChange={(e) => setMemo(e.target.value)}
+                  />
+                </label>
+                {dialog.p && (
+                  <label className="of-check">
+                    <input
+                      type="checkbox"
+                      checked={onlyProduct}
+                      onChange={(e) => setOnlyProduct(e.target.checked)}
+                    />
+                    이 상품에만 적용하는 주문 방법
+                  </label>
                 )}
-              </div>
-            ))}
-          </div>
-          <p className="order-help">
-            폴더와 링크는 왼쪽 즐겨찾기에서 끌어 이동할 수 있습니다. 삭제한
-            링크는 30일 동안 복원할 수 있습니다.
-          </p>
-        </Modal>
-      )}
-      {editor && (
-        <BookmarkEditor
-          bookmark={editor.bookmark}
-          folders={preferences.folders}
-          onClose={() => setEditor(null)}
-          onSave={(b) =>
-            data.change((p) => ({
-              ...p,
-              bookmarks: p.bookmarks.some((x) => x.id === b.id)
-                ? p.bookmarks.map((x) => (x.id === b.id ? b : x))
-                : [...p.bookmarks, b],
-              folders: p.folders.some((f) => f.id === b.folderId)
-                ? p.folders
-                : [
-                    ...p.folders,
-                    {
-                      id: b.folderId,
-                      name: b.category,
-                      parentId: null,
-                      category: b.category,
-                      order: Date.now(),
-                    },
-                  ],
-            }))
-          }
-        />
-      )}{" "}
-      {replace && (
-        <Modal title="고정 즐겨찾기 교체" onClose={() => setReplace(null)}>
-          <p>
-            고정 10개가 모두 채워졌습니다. {replace.title}로 교체할 위치를
-            선택해 주세요.
-          </p>
-          {hot.fixed.map((b) => (
-            <button
-              className="order-replace-option"
-              key={b.id}
-              onClick={() =>
-                void perform(async () => {
-                  await data.change((p) => ({
-                    ...p,
-                    bookmarks: pinBookmark(p.bookmarks, replace.id, b.id),
-                  }));
-                  setReplace(null);
-                })
-              }
-            >
-              {(b.rank ?? 0) + 1}. {b.title}
-            </button>
-          ))}
-        </Modal>
-      )}
-      {modal === "newProduct" && (
-        <NewProduct
-          initialName={query}
-          onClose={() => setModal(null)}
-          suppliers={[
-            ...new Set(
-              snapshot?.products.flatMap((p) =>
-                p.frequency.map((f) => f.supplier),
-              ) ?? [],
-            ),
-          ]}
-          onSave={async (name, supplier) => {
-            const id = stableId(`manual|${name}`);
-            const link = preferences.bookmarks.find(
-              (b) => b.title === supplier,
-            );
-            await data.change((p) => ({
-              ...p,
-              suppliers: {
-                ...p.suppliers,
-                [supplier]: p.suppliers[supplier] ?? {
-                  method: "사이트",
-                  memo: "",
-                  ...(link ? { bookmarkId: link.id } : {}),
-                },
-              },
-            }));
-            const p: Product = {
-              id: `${id}-unclassified`,
-              baseId: id,
-              name,
-              sourceName: name,
-              manufacturer: "",
-              usage: "unclassified",
-              matchStatus: "unclassified",
-              latest: [],
-              frequency: [],
-              manualSupplier: supplier,
-            };
-            const next = snapshot ?? {
-              version: "",
-              asOf: todayKorea(),
-              products: [],
-              catalogs: [],
-              stats: {
-                rows: 0,
-                names: 0,
-                matchedRows: 0,
-                unclassifiedRows: 0,
-                reviewRows: 0,
-                futureRows: 0,
-                returnRows: 0,
-                missingNames: 0,
-              },
-              importedAt: new Date().toISOString(),
-            };
-            await data.saveSnapshot({
-              ...next,
-              previousVersion: next.version || undefined,
-              version: crypto.randomUUID(),
-              products: next.products.some((x) => x.id === p.id)
-                ? next.products.map((x) =>
-                    x.id === p.id ? { ...x, manualSupplier: supplier } : x,
-                  )
-                : [...next.products, p],
-            });
-            setQuery(name);
-            setSelectedId(p.id);
-            setNotice(`${name}의 주문처: ${supplier}`);
-            setModal(null);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-function NewProduct({
-  initialName,
-  suppliers,
-  onSave,
-  onClose,
-}: {
-  initialName: string;
-  suppliers: string[];
-  onSave: (n: string, s: string) => Promise<void>;
-  onClose: () => void;
-}) {
-  const [name, setName] = useState(initialName);
-  const [supplier, setSupplier] = useState("");
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
-  return (
-    <Modal title="주문처 직접 등록" onClose={onClose}>
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setSaving(true);
-          try {
-            if (!name.trim() || !supplier.trim())
-              throw new Error("상품명과 주문처를 입력해 주세요.");
-            await onSave(name.trim(), supplier.trim());
-          } catch (e) {
-            setError(e instanceof Error ? e.message : String(e));
-          } finally {
-            setSaving(false);
-          }
-        }}
-      >
-        <label>
-          상품명
-          <input
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
-        <label>
-          주문처
-          <input
-            required
-            list="order-suppliers"
-            value={supplier}
-            onChange={(e) => setSupplier(e.target.value)}
-          />
-          <datalist id="order-suppliers">
-            {suppliers.map((s) => (
-              <option key={s} value={s} />
-            ))}
-          </datalist>
-        </label>
-        {error && (
-          <p role="alert" className="order-error">
-            {error}
-          </p>
+                <button disabled={busy} onClick={() => void saveSupplier()}>
+                  저장
+                </button>
+              </>
+            )}
+            {dialog.kind === "contact" && (
+              <>
+                <strong>
+                  {dialog.supplier} · {method}
+                </strong>
+                <p>{phone || "전화번호 미등록"}</p>
+                <p>{memo}</p>
+                {dialog.p && (
+                  <button
+                    onClick={() => void copy(shortName(dialog.p!, prefs))}
+                  >
+                    검색명 복사
+                  </button>
+                )}
+                {phone && (method === "문자" || method === "전화") && (
+                  <a href={method === "문자" ? "sms:" + phone : "tel:" + phone}>
+                    {method === "문자" ? "문자 작성" : "전화 걸기"}
+                  </a>
+                )}
+                <button onClick={() => void copy(phone)}>전화번호 복사</button>
+                <button onClick={() => edit({ ...dialog, kind: "supplier" })}>
+                  주문 정보 수정
+                </button>
+              </>
+            )}
+            {dialog.kind === "new" && (
+              <>
+                <label>
+                  상품명 · 일반약은 포장별로 등록
+                  <input
+                    value={field}
+                    onChange={(e) => setField(e.target.value)}
+                  />
+                </label>
+                <label>
+                  용도
+                  <select
+                    value={newUsage}
+                    onChange={(e) => setNewUsage(e.target.value as Usage)}
+                  >
+                    <option value="retail">판매</option>
+                    <option value="dispensing">조제</option>
+                  </select>
+                </label>
+                <label>
+                  주문 거래처
+                  <input
+                    list="of-suppliers"
+                    value={memo}
+                    onChange={(e) => setMemo(e.target.value)}
+                  />
+                </label>
+                <datalist id="of-suppliers">
+                  {suppliers.map((n) => (
+                    <option key={n}>{n}</option>
+                  ))}
+                </datalist>
+                <button disabled={busy} onClick={() => void createProduct()}>
+                  등록
+                </button>
+              </>
+            )}
+            {dialog.kind === "classify" && (
+              <>
+                <p>
+                  {dialog.p?.sourceName} · {dialog.p?.manufacturer}
+                </p>
+                <label>
+                  약품코드
+                  <input
+                    list="of-catalog"
+                    value={field}
+                    onChange={(e) => setField(e.target.value)}
+                  />
+                </label>
+                <datalist id="of-catalog">
+                  {snapshot?.catalogs
+                    .filter(
+                      (c) =>
+                        !field ||
+                        c.code.includes(field) ||
+                        normalizeName(c.name).includes(normalizeName(field)),
+                    )
+                    .slice(0, 100)
+                    .map((c, i) => (
+                      <option key={i} value={c.code}>
+                        {c.name} · {c.manufacturer}
+                      </option>
+                    ))}
+                </datalist>
+                <button
+                  disabled={busy}
+                  onClick={() => void classify(dialog.p!, field)}
+                >
+                  확인하여 연결
+                </button>
+              </>
+            )}
+          </Modal>
         )}
-        <button className="order-primary" disabled={saving}>
-          {saving ? "저장 중…" : "저장"}
-        </button>
-      </form>
-    </Modal>
+    </div>
   );
 }

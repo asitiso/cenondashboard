@@ -104,6 +104,7 @@ export function useOrderData() {
   ) => {
     if (!remoteReady.current)
       throw new Error("공용 자료를 불러온 뒤 다시 저장해 주세요.");
+    const previousSnapshot = snapRef.current;
     const updatedPreferences = await publishSnapshot(
       value,
       isFirebaseConfigured ? value.previousVersion : undefined,
@@ -114,6 +115,8 @@ export function useOrderData() {
       prefRef.current = updatedPreferences;
       setPreferences(updatedPreferences);
     }
+    if (previousSnapshot)
+      await writeCache("previousSnapshot", previousSnapshot);
     snapRef.current = value;
     remoteVersion.current = isFirebaseConfigured ? value.version : undefined;
     setSnapshot(value);

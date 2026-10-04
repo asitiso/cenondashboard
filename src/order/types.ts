@@ -34,6 +34,7 @@ export interface Product {
   usage: Usage;
   matchStatus: "matched" | "unclassified" | "review";
   latest: Purchase[];
+  supplierHistory?: Record<string, Purchase[]>;
   frequency: { supplier: string; count: number }[];
   candidateCodes?: string[];
   manualSupplier?: string;
@@ -76,6 +77,9 @@ export interface Bookmark {
   folderId: string;
   category: string;
   memo: string;
+  supplierNames?: string[];
+  phone?: string;
+  methods?: string[];
   rank?: number;
   order?: number;
   deletedAt?: string;
@@ -86,10 +90,15 @@ export interface UsageDay {
 }
 export interface SupplierSetting {
   bookmarkId?: string;
+  phone?: string;
+  methods?: string[];
   method: "사이트" | "전화" | "카카오톡·문자" | "기타";
   memo: string;
 }
 export interface Preferences {
+  barcodes?: Record<string, string[]>;
+  searchNames?: Record<string, string>;
+  productSuppliers?: Record<string, SupplierSetting>;
   units: Record<string, UnitSetting>;
   suppliers: Record<string, SupplierSetting>;
   overrides: Record<string, string>;

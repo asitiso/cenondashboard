@@ -135,14 +135,22 @@ export function buildSnapshot(
         ]);
       const currentSignatures = new Set(normal.map(signature));
       const historic =
-        old?.latest.filter(
+        (old
+          ? Object.values(old.supplierHistory ?? { legacy: old.latest }).flat()
+          : []
+        ).filter(
           (x) => x.date < start && !currentSignatures.has(signature(x)),
         ) ?? [];
-      const latest = [...normal, ...historic]
-        .sort(
-          (a, b) => b.date.localeCompare(a.date) || a.sourceRow - b.sourceRow,
-        )
-        .slice(0, 3);
+      const history = [...normal, ...historic].sort(
+        (a, b) => b.date.localeCompare(a.date) || a.sourceRow - b.sourceRow,
+      );
+      const latest = history.slice(0, 3);
+      const supplierHistory: Record<string, Purchase[]> = {};
+      for (const row of history) {
+        const saved = supplierHistory[row.supplier] ?? [];
+        if (saved.length < 3) saved.push(row);
+        supplierHistory[row.supplier] = saved;
+      }
       // Keep repeats within the source export; there is no invoice ID.
       products.push({
         id,
@@ -153,6 +161,7 @@ export function buildSnapshot(
         usage,
         matchStatus: status,
         latest,
+        supplierHistory,
         frequency: [...frequency]
           .map(([supplier, count]) => ({ supplier, count }))
           .sort(
@@ -172,6 +181,11 @@ export function buildSnapshot(
       products.push({
         ...old,
         latest: old.latest.filter((r) => r.date < start),
+        supplierHistory: Object.fromEntries(
+          Object.entries(old.supplierHistory ?? { legacy: old.latest }).map(
+            ([name, rows]) => [name, rows.filter((r) => r.date < start)],
+          ),
+        ),
         frequency: [],
       });
   }
@@ -196,6 +210,7 @@ export function buildSnapshot(
         code: c.code,
         matchStatus: "matched",
         latest: [],
+        supplierHistory: {},
         frequency: [],
       });
   }
@@ -256,6 +271,7 @@ function distance(a: string, b: string) {
 export function searchProducts(
   products: Product[],
   query: string,
+  includeSuppliers = true,
 ): { results: Product[]; suggested: boolean } {
   const q = normalizeName(query);
   if (!q) return { results: [], suggested: false };
@@ -268,23 +284,25 @@ export function searchProducts(
           p.sourceName,
           p.manufacturer,
           p.code ?? "",
-          p.manualSupplier ?? "",
-          ...p.frequency.map((x) => x.supplier),
-          ...p.latest.map((x) => x.supplier),
+          ...(includeSuppliers
+            ? [
+                p.manualSupplier ?? "",
+                ...p.frequency.map((x) => x.supplier),
+                ...p.latest.map((x) => x.supplier),
+              ]
+            : []),
         ].join(" "),
       ).includes(t),
     ),
   );
   if (direct.length)
     return {
-      results: direct
-        .sort(
-          (a, b) =>
-            Number(normalizeName(b.name).startsWith(q)) -
-              Number(normalizeName(a.name).startsWith(q)) ||
-            Number(!!b.latest.length) - Number(!!a.latest.length),
-        )
-        .slice(0, 80),
+      results: direct.sort(
+        (a, b) =>
+          Number(!!b.latest.length) - Number(!!a.latest.length) ||
+          Number(normalizeName(b.name).startsWith(q)) -
+            Number(normalizeName(a.name).startsWith(q)),
+      ),
       suggested: false,
     };
   if (q.length < 2 || q.length > 40) return { results: [], suggested: false };
@@ -339,6 +357,7 @@ export function pinBookmark(
     (b) =>
       !b.deletedAt &&
       b.rank !== undefined &&
+      !!safeUrl(target.url) &&
       safeUrl(b.url) === safeUrl(target.url),
   );
   const replacement = replaceId
@@ -355,11 +374,11 @@ export function pinBookmark(
   );
   const rank =
     replacement?.rank ??
-    Array.from({ length: 10 }, (_, i) => i).find((i) => !occupied.has(i));
-  if (rank === undefined)
-    throw new Error(
-      "고정 10개가 모두 채워졌습니다. 교체할 항목을 선택해 주세요.",
+    Array.from({ length: links.length + 1 }, (_, i) => i).find(
+      (i) => !occupied.has(i),
     );
+  if (rank === undefined)
+    throw new Error("즐겨찾기 순서를 배정할 수 없습니다. 다시 시도해 주세요.");
   return links.map((b) =>
     b.id === id ? { ...b, rank } : b.id === replacement?.id ? remove(b) : b,
   );
@@ -372,8 +391,7 @@ export function topBookmarks(
   const active = links.filter((x) => !x.deletedAt);
   const fixed = active
     .filter((x) => x.rank !== undefined)
-    .sort((a, b) => a.rank! - b.rank!)
-    .slice(0, 10);
+    .sort((a, b) => a.rank! - b.rank!);
   const fixedUrls = new Set(fixed.map((x) => safeUrl(x.url)));
   const cutoff = new Date(`${asOf}T00:00:00Z`);
   cutoff.setUTCDate(cutoff.getUTCDate() - 29);
