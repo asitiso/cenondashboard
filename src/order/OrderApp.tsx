@@ -113,6 +113,7 @@ export default function OrderApp({
     [memo, setMemo] = useState(""),
     [onlyProduct, setOnlyProduct] = useState(false),
     [chosenSite, setChosenSite] = useState(""),
+    [siteQuery, setSiteQuery] = useState(""),
     [busy, setBusy] = useState(false);
   const [newUsage, setNewUsage] = useState<Usage>("retail");
   const active = prefs.bookmarks.filter((b) => !b.deletedAt),
@@ -243,6 +244,7 @@ export default function OrderApp({
           prefs.suppliers[d.supplier],
         link = active.find((b) => b.id === conf?.bookmarkId);
       setChosenSite(link?.id ?? "");
+      setSiteQuery("");
       setAddress(link?.url ?? "");
       setPhone(conf?.phone ?? link?.phone ?? "");
       setMethod(
@@ -1256,7 +1258,14 @@ export default function OrderApp({
                 <h3>{dialog.supplier}</h3>
                 <label>
                   연결 사이트
+                  <input
+                    aria-label="연결 사이트 검색"
+                    placeholder="사이트 이름 일부로 검색"
+                    value={siteQuery}
+                    onChange={(e) => setSiteQuery(e.target.value)}
+                  />
                   <select
+                    aria-label="연결 사이트 선택"
                     value={chosenSite}
                     onChange={(e) => {
                       setChosenSite(e.target.value);
@@ -1266,7 +1275,13 @@ export default function OrderApp({
                     }}
                   >
                     <option value="">새 주문처 등록</option>
-                    {active.map((b) => (
+                    {active
+                      .filter((b) =>
+                        b.id === chosenSite ||
+                        normalizeName(b.title).includes(normalizeName(siteQuery)),
+                      )
+                      .sort((a, b) => a.title.localeCompare(b.title, "ko", { numeric: true }))
+                      .map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.title}
                       </option>
