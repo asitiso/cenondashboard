@@ -642,6 +642,12 @@ export default function OrderApp() {
           )}
           {!query && !scope ? (
             <>
+              {snapshot && (
+                <p className="of-muted" role="status">
+                  검색 가능한 상품 {snapshot.products.length.toLocaleString()}품목
+                  · 위 검색창에 상품명이나 거래처를 입력하세요.
+                </p>
+              )}
               <section>
                 <div className="of-section-heading">
                   <h2>고정 즐겨찾기</h2>
@@ -674,7 +680,7 @@ export default function OrderApp() {
                   </>
                 )}
               </section>
-              <h2>업무 사이트</h2>
+              {active.length > 0 && <h2>업무 사이트</h2>}
               <div className="of-directory">
                 {prefs.folders.map((f) => {
                   const links = active.filter((b) => b.folderId === f.id);
@@ -921,7 +927,7 @@ export default function OrderApp() {
                 : "이 기기에 저장"}{" "}
             ·{" "}
             {snapshot
-              ? `매입 ${snapshot.stats.rows.toLocaleString()}행 · 할인/할증 보정 없음`
+              ? `${snapshot.products.length.toLocaleString()}품목 · 할인/할증 보정 없음`
               : "자료를 가져오면 상품 검색을 사용할 수 있습니다."}
           </footer>
         </main>

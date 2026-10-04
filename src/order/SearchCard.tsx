@@ -220,10 +220,12 @@ export function SearchCard({
                       <div key={i}>
                         <span>{h.date}</span>
                         <span>{price(h)}</span>
-                        <span>
-                          입고 {h.quantity.toLocaleString()}
-                          {setting?.baseUnit ?? "단위"}
-                        </span>
+                        {h.quantity > 0 && (
+                          <span>
+                            입고 {h.quantity.toLocaleString()}
+                            {setting?.baseUnit ?? "단위"}
+                          </span>
+                        )}
                       </div>
                     ))}
                     {methods.length > 1 && (
