@@ -73,11 +73,7 @@ type Dialog = {
   from?: "manage";
 };
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-export default function OrderApp({
-  onNavigate,
-}: {
-  onNavigate: (v: "order" | "operations") => void;
-}) {
+export default function OrderApp() {
   const data = useOrderData(),
     { snapshot, preferences: prefs } = data;
   const [query, setQuery] = useState(""),
@@ -559,10 +555,6 @@ export default function OrderApp({
   }
   return (
     <div ref={appRoot} className={"of-app of-font-" + font}>
-      <header className="of-top">
-        <strong>센트럴온누리약국</strong>
-        <TopNavigation active="order" onNavigate={onNavigate} />
-      </header>
       <div className="of-layout">
         <aside className="of-sidebar">
           <h2>즐겨찾기 폴더</h2>

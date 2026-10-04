@@ -1681,6 +1681,7 @@ h2 {
 /* Shared visual language with the confirmed order finder. Legacy token names
    remain for compatibility with existing dashboard components. */
 :root {
+  --app-topbar-height: 49px;
   color: #222;
   background: #fff;
   --green-950: #222;
@@ -1694,6 +1695,28 @@ h2 {
   --line: #ccc;
   --muted: #666;
 }
+
+/* Both workspaces share one header, independent of sidebar width. */
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  height: var(--app-topbar-height);
+  min-height: var(--app-topbar-height);
+  background: #fff;
+  color: #222;
+  font: 14px/1.4 Pretendard, "Segoe UI", sans-serif;
+}
+.app-topbar .order-top-tabs button {
+  font: inherit;
+  color: inherit;
+}
+.app-topbar .order-top-tabs button.active { color: #fff; }
+.app-shell .sidebar {
+  top: var(--app-topbar-height);
+  height: calc(100vh - var(--app-topbar-height));
+}
+.app-shell .sidebar-backdrop { top: var(--app-topbar-height); }
 .app-shell { background: #fff; color: #222; }
 .app-shell strong { font-weight: 600; }
 .app-shell button, .app-shell input, .app-shell select, .app-shell textarea { font-family: inherit; }
@@ -1789,4 +1812,11 @@ h2 {
   .app-shell .topbar { margin-bottom: 8px; gap: 6px; }
   .app-shell .dense-list { max-height: 45vh; }
   .app-shell .detail-section-list.manual-flow .detail-list dd { font-size: 13px; }
+}
+
+/* Shared header offsets also override the workspace density rules. */
+.app-shell, .of-app { min-height: calc(100vh - var(--app-topbar-height)); }
+.app-shell .topbar { min-height: 28px; }
+@media (max-width: 800px) {
+  .of-app .of-search { top: var(--app-topbar-height); }
 }

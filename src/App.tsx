@@ -839,12 +839,16 @@ export default function App() {
     setActive(value);
   };
   return <>
-    <div hidden={active !== "order"}><OrderApp onNavigate={navigate} /></div>
-    {visitedOperations && <div hidden={active !== "operations"}><OperationsDashboard onNavigate={navigate} /></div>}
+    <header className="of-top app-topbar">
+      <strong>센트럴온누리약국</strong>
+      <TopNavigation active={active} onNavigate={navigate} />
+    </header>
+    <div hidden={active !== "order"}><OrderApp /></div>
+    {visitedOperations && <div hidden={active !== "operations"}><OperationsDashboard /></div>}
   </>;
 }
 
-function OperationsDashboard({ onNavigate }: { onNavigate: (value: "order" | "operations") => void }) {
+function OperationsDashboard() {
   const {
     items,
     user,
@@ -976,7 +980,6 @@ function OperationsDashboard({ onNavigate }: { onNavigate: (value: "order" | "op
       <main className="main-area">
         <header className="topbar">
           <button className="mobile-menu" type="button" onClick={() => setMobileMenuOpen(true)} aria-label="메뉴 열기"><Menu size={18} /></button>
-          <TopNavigation active="operations" onNavigate={onNavigate} />
           {mockMode && <span className="mode-badge">목업 모드</span>}
           {!mockMode && <span className="mode-badge live"><CheckCircle2 size={14} /> 실시간</span>}
         </header>
