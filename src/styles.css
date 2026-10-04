@@ -934,15 +934,15 @@ h2 {
 .urgency-dot.low { background: #9c9c9c; }
 
 .status-new { background: #efefef; color: var(--green-800); }
-.status-valid { background: var(--green-100); color: var(--green-900); }
-.status-review { background: var(--cream-strong); color: #595959; }
-.status-inProgress { background: var(--green-100); color: var(--green-900); }
-.status-done { background: #f2f2f2; color: #636363; }
-.status-overdue { background: #ebebeb; color: #4f4f4f; }
-.status-archived { background: #f2f2f2; color: #5d5d5d; }
+.status-valid { background: #eef8f2; color: #2e8b57; }
+.status-review { background: #fff6e5; color: #c7831d; }
+.status-inProgress { background: #edf5fc; color: #3478b8; }
+.status-done { background: #edf8f4; color: #27806a; }
+.status-overdue { background: #fceeee; color: #b93838; }
+.status-archived { background: #f3f0fa; color: #7767a8; }
 
 .priority-badge {
-  background: #4b4b4b;
+  background: #d64545;
   color: #ffffff;
 }
 
