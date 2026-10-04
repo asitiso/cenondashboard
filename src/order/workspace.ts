@@ -35,14 +35,8 @@ export function displayPrice(
         : price.mainUnit.replace(/당$/, ""),
   };
 }
-export function priceChange(
-  p: Product,
-  supplier: string,
-  setting?: UnitSetting,
-) {
-  const [current, previous] = allReceipts(p).filter(
-    (r) => r.supplier === supplier,
-  );
+export function priceChange(p: Product, setting?: UnitSetting) {
+  const [current, previous] = p.latest;
   if (!current || !previous) return null;
   const now = displayPrice(current, setting, p.usage).amount,
     old = displayPrice(previous, setting, p.usage).amount;
@@ -56,6 +50,7 @@ export function priceChange(
     previous,
   };
 }
+
 export function descendants(folders: BookmarkFolder[], id: string) {
   const ids = new Set([id]);
   let changed = true;
