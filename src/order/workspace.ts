@@ -35,15 +35,23 @@ export function displayPrice(
         : price.mainUnit.replace(/당$/, ""),
   };
 }
-export function priceIncrease(p: Product, setting?: UnitSetting) {
-  const [current, previous] = p.latest;
+export function priceChange(
+  p: Product,
+  supplier: string,
+  setting?: UnitSetting,
+) {
+  const [current, previous] = allReceipts(p).filter(
+    (r) => r.supplier === supplier,
+  );
   if (!current || !previous) return null;
   const now = displayPrice(current, setting, p.usage).amount,
     old = displayPrice(previous, setting, p.usage).amount;
-  if (old <= 0 || now <= old) return null;
+  if (old <= 0 || now <= 0 || now === old) return null;
+  const difference = now - old;
   return {
-    difference: now - old,
-    percent: ((now - old) / old) * 100,
+    direction: difference > 0 ? ("up" as const) : ("down" as const),
+    difference,
+    percent: (Math.abs(difference) / old) * 100,
     current,
     previous,
   };
