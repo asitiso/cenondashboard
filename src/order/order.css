@@ -1351,24 +1351,17 @@
   text-overflow: ellipsis;
   overflow: hidden;
 }
-.of-price-change-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: 4px;
-  padding: 1px 4px;
-  border-radius: 3px;
+.of-rise-tag {
   font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.of-price-change-tag.up {
-  color: #c62828;
+  padding: 1px 3px;
   background: #fff1f1;
+  color: #c62828;
+  font-weight: 500;
 }
-.of-price-change-tag.down {
-  color: #1565c0;
-  background: #eef5ff;
+.of-rise-tag.high {
+  border: 1px solid #d32f2f;
+  color: #b71c1c;
+  font-weight: 600;
 }
 .of-product-details {
   border-top: 1px solid #ddd;
@@ -1385,28 +1378,23 @@
   font-size: 11px;
   padding: 4px 6px;
 }
-.of-price-change {
-  padding: 7px 9px;
+.of-price-rise {
+  background: #fff4f4;
+  border-left: 3px solid #d32f2f;
+  color: #a51f1f;
+  padding: 6px 8px;
   font-size: 12px;
   margin-bottom: 7px;
-  border-left: 3px solid;
 }
-.of-price-change strong {
-  display: block;
+.of-price-rise strong {
   font-weight: 600;
 }
-.of-price-change small {
+.of-price-rise.high {
+  border: 1px solid #d32f2f;
+  border-left: 3px solid #b71c1c;
+}
+.of-price-rise small {
   margin-top: 3px;
-}
-.of-price-change.up {
-  color: #a51f1f;
-  background: #fff4f4;
-  border-left-color: #d32f2f;
-}
-.of-price-change.down {
-  color: #14569a;
-  background: #f1f6ff;
-  border-left-color: #1976d2;
 }
 .of-vendor-wrap {
   background: #fff;
