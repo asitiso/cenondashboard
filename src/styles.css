@@ -1736,7 +1736,7 @@ h2 {
 .app-shell .order-top-tabs button.active:after { display: none; }
 .app-shell h1 { font-size: 25px; font-weight: 600; }
 .app-shell h2 { font-weight: 600; }
-.app-shell .dense-row strong { font-size: 13px; }
+.app-shell .dense-row strong { font-size: 14px; }
 .app-shell .summary-card, .app-shell .compact-metric { border: 1px solid #ccc; }
 .app-shell .error-strip, .app-shell .status-overdue, .app-shell .drug-fact.drug-status.긴급 { border: 1px solid #777; }
 .app-shell .urgency-dot.critical { background: #222; }
@@ -1744,8 +1744,8 @@ h2 {
 .app-shell .urgency-dot.normal { background: #999; }
 .app-shell .urgency-dot.low { background: #bbb; }
 @media (max-width: 640px) {
-  .app-shell { font-size: 14px; }
-  .app-shell h1 { font-size: 23px; }
+  .app-shell { font-size: 15px; }
+  .app-shell h1 { font-size: 24px; }
   .app-shell .dense-row strong { font-size: 13px; }
 }
 
@@ -1811,7 +1811,7 @@ h2 {
   .app-shell .main-area { padding: 8px 10px; }
   .app-shell .topbar { margin-bottom: 8px; gap: 6px; }
   .app-shell .dense-list { max-height: 45vh; }
-  .app-shell .detail-section-list.manual-flow .detail-list dd { font-size: 14px; }
+  .app-shell .detail-section-list.manual-flow .detail-list dd { font-size: 15px; }
 }
 
 /* Shared header offsets also override the workspace density rules. */
