@@ -46,7 +46,7 @@ export function SearchCard({
     selected = scope.length
       ? rows.find((r) => scope.includes(r.supplier))
       : rows[0],
-    change = selected ? priceChange(p, selected.supplier, setting) : null;
+    change = priceChange(p, setting);
   const supplierSetting = (name: string) =>
     prefs.productSuppliers?.[p.baseId + "|" + name] ?? prefs.suppliers[name];
   const site = (name: string) =>
