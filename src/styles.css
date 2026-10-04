@@ -870,14 +870,17 @@ h2 {
 }
 
 .drug-fact.priority {
-  border-color: var(--green-800);
-  background: var(--green-800);
+  border-color: #d64545;
+  background: #d64545;
   color: #ffffff;
   cursor: pointer;
 }
 
 .drug-fact.first-toggle {
   cursor: pointer;
+  border-color: #e2a3a3;
+  background: #fff6f6;
+  color: #b23a3a;
 }
 
 .drug-fact.priority small,
@@ -1249,9 +1252,14 @@ h2 {
   font-weight: 600;
 }
 
+.drug-detail-actions button {
+  border-color: #e2a3a3;
+  background: #fff6f6;
+  color: #b23a3a;
+}
 .drug-detail-actions button.selected {
-  border-color: var(--green-800);
-  background: var(--green-800);
+  border-color: #d64545;
+  background: #d64545;
   color: #ffffff;
 }
 
