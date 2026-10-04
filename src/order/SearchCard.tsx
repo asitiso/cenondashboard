@@ -3,6 +3,7 @@ import type { Product, Preferences, Purchase } from "./types";
 import {
   displayPrice,
   priceIncrease,
+  priceDecrease,
   supplierRows,
   allReceipts,
 } from "./workspace";
@@ -46,7 +47,8 @@ export function SearchCard({
     selected = scope.length
       ? rows.find((r) => scope.includes(r.supplier))
       : rows[0],
-    rise = priceIncrease(p, setting);
+    rise = priceIncrease(p, setting),
+    drop = priceDecrease(p, setting);
   const supplierSetting = (name: string) =>
     prefs.productSuppliers?.[p.baseId + "|" + name] ?? prefs.suppliers[name];
   const site = (name: string) =>
@@ -89,6 +91,15 @@ export function SearchCard({
                     }
                   >
                     ▲ {rise.percent.toFixed(1)}%
+                  </span>
+                )}
+                {!expanded && drop && (
+                  <span
+                    className={
+                      "of-drop-tag " + (drop.percent >= 5 ? "high" : "")
+                    }
+                  >
+                    ▼ {drop.percent.toFixed(1)}%
                   </span>
                 )}
               </div>
@@ -156,6 +167,37 @@ export function SearchCard({
                 ).amount.toLocaleString()}
                 원 ({rise.previous.date})
                 {rise.current.supplier !== rise.previous.supplier
+                  ? " · 거래처 변경"
+                  : ""}
+              </small>
+            </div>
+          )}
+          {drop && (
+            <div
+              className={"of-price-drop " + (drop.percent >= 5 ? "high" : "")}
+            >
+              <strong>
+                ▼{" "}
+                {drop.difference.toLocaleString("ko-KR", {
+                  maximumFractionDigits: 2,
+                })}
+                원 하락 (-{drop.percent.toFixed(1)}%) · 가격 확인
+              </strong>
+              <small>
+                최근 {drop.current.supplier}{" "}
+                {displayPrice(
+                  drop.current,
+                  setting,
+                  p.usage,
+                ).amount.toLocaleString()}
+                원 ({drop.current.date}) ← 직전 {drop.previous.supplier}{" "}
+                {displayPrice(
+                  drop.previous,
+                  setting,
+                  p.usage,
+                ).amount.toLocaleString()}
+                원 ({drop.previous.date})
+                {drop.current.supplier !== drop.previous.supplier
                   ? " · 거래처 변경"
                   : ""}
               </small>
