@@ -48,6 +48,19 @@ export function priceIncrease(p: Product, setting?: UnitSetting) {
     previous,
   };
 }
+export function priceDecrease(p: Product, setting?: UnitSetting) {
+  const [current, previous] = p.latest;
+  if (!current || !previous) return null;
+  const now = displayPrice(current, setting, p.usage).amount,
+    old = displayPrice(previous, setting, p.usage).amount;
+  if (old <= 0 || now >= old) return null;
+  return {
+    difference: old - now,
+    percent: ((old - now) / old) * 100,
+    current,
+    previous,
+  };
+}
 export function descendants(folders: BookmarkFolder[], id: string) {
   const ids = new Set([id]);
   let changed = true;
