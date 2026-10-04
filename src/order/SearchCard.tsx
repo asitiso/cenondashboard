@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Product, Preferences, Purchase } from "./types";
 import {
   displayPrice,
-  priceIncrease,
+  priceChange,
   supplierRows,
   allReceipts,
 } from "./workspace";
@@ -46,7 +46,7 @@ export function SearchCard({
     selected = scope.length
       ? rows.find((r) => scope.includes(r.supplier))
       : rows[0],
-    rise = priceIncrease(p, setting);
+    change = selected ? priceChange(p, selected.supplier, setting) : null;
   const supplierSetting = (name: string) =>
     prefs.productSuppliers?.[p.baseId + "|" + name] ?? prefs.suppliers[name];
   const site = (name: string) =>
@@ -82,13 +82,21 @@ export function SearchCard({
             <>
               <div>
                 {price(selected)}{" "}
-                {!expanded && rise && (
+                {!expanded && change && (
                   <span
-                    className={
-                      "of-rise-tag " + (rise.percent >= 5 ? "high" : "")
+                    className={"of-price-change-tag " + change.direction}
+                    title={
+                      change.direction === "up"
+                        ? "직전 매입 대비 단가 상승"
+                        : "직전 매입 대비 단가 하락"
                     }
                   >
-                    ▲ {rise.percent.toFixed(1)}%
+                    {change.direction === "up" ? "▲" : "▼"}{" "}
+                    {change.direction === "up" ? "+" : "-"}
+                    {Math.abs(change.difference).toLocaleString("ko-KR", {
+                      maximumFractionDigits: 2,
+                    })}
+                    원
                   </span>
                 )}
               </div>
@@ -130,34 +138,35 @@ export function SearchCard({
               <button onClick={() => onSearchName(p)}>검색명 수정</button>
             </div>
           </div>
-          {rise && (
-            <div
-              className={"of-price-rise " + (rise.percent >= 5 ? "high" : "")}
-            >
+          {change && (
+            <div className={"of-price-change " + change.direction}>
               <strong>
-                ▲{" "}
-                {rise.difference.toLocaleString("ko-KR", {
+                {change.direction === "up" ? "▲" : "▼"}{" "}
+                {Math.abs(change.difference).toLocaleString("ko-KR", {
                   maximumFractionDigits: 2,
                 })}
-                원 상승 (+{rise.percent.toFixed(1)}%) · 가격 확인
+                원 {change.direction === "up" ? "상승" : "하락"} (
+                {change.direction === "up" ? "+" : "-"}
+                {change.percent.toFixed(1)}%)
               </strong>
               <small>
-                최근 {rise.current.supplier}{" "}
+                {change.current.supplier} · 직전{" "}
                 {displayPrice(
-                  rise.current,
+                  change.previous,
                   setting,
                   p.usage,
-                ).amount.toLocaleString()}
-                원 ({rise.current.date}) ← 직전 {rise.previous.supplier}{" "}
+                ).amount.toLocaleString("ko-KR", {
+                  maximumFractionDigits: 2,
+                })}
+                원 → 현재{" "}
                 {displayPrice(
-                  rise.previous,
+                  change.current,
                   setting,
                   p.usage,
-                ).amount.toLocaleString()}
-                원 ({rise.previous.date})
-                {rise.current.supplier !== rise.previous.supplier
-                  ? " · 거래처 변경"
-                  : ""}
+                ).amount.toLocaleString("ko-KR", {
+                  maximumFractionDigits: 2,
+                })}
+                원 · {change.previous.date} → {change.current.date}
               </small>
             </div>
           )}
