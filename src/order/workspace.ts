@@ -35,22 +35,19 @@ export function displayPrice(
         : price.mainUnit.replace(/당$/, ""),
   };
 }
-export function priceChange(p: Product, setting?: UnitSetting) {
+export function priceIncrease(p: Product, setting?: UnitSetting) {
   const [current, previous] = p.latest;
   if (!current || !previous) return null;
   const now = displayPrice(current, setting, p.usage).amount,
     old = displayPrice(previous, setting, p.usage).amount;
-  if (old <= 0 || now <= 0 || now === old) return null;
-  const difference = now - old;
+  if (old <= 0 || now <= old) return null;
   return {
-    direction: difference > 0 ? ("up" as const) : ("down" as const),
-    difference,
-    percent: (Math.abs(difference) / old) * 100,
+    difference: now - old,
+    percent: ((now - old) / old) * 100,
     current,
     previous,
   };
 }
-
 export function descendants(folders: BookmarkFolder[], id: string) {
   const ids = new Set([id]);
   let changed = true;
