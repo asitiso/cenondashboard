@@ -1744,9 +1744,9 @@ h2 {
 .app-shell .urgency-dot.normal { background: #999; }
 .app-shell .urgency-dot.low { background: #bbb; }
 @media (max-width: 640px) {
-  .app-shell { font-size: 13px; }
-  .app-shell h1 { font-size: 21px; }
-  .app-shell .dense-row strong { font-size: 12px; }
+  .app-shell { font-size: 14px; }
+  .app-shell h1 { font-size: 23px; }
+  .app-shell .dense-row strong { font-size: 13px; }
 }
 
 /* Match order finder typography and vertical density without changing flows. */
@@ -1807,11 +1807,11 @@ h2 {
 .app-shell .manual-editor-panel input,
 .app-shell .manual-editor-panel textarea { padding: 7px; }
 @media (max-width: 640px) {
-  .app-shell { font-size: 13px; }
+  .app-shell { font-size: 14px; }
   .app-shell .main-area { padding: 8px 10px; }
   .app-shell .topbar { margin-bottom: 8px; gap: 6px; }
   .app-shell .dense-list { max-height: 45vh; }
-  .app-shell .detail-section-list.manual-flow .detail-list dd { font-size: 13px; }
+  .app-shell .detail-section-list.manual-flow .detail-list dd { font-size: 14px; }
 }
 
 /* Shared header offsets also override the workspace density rules. */
