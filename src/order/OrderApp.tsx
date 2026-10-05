@@ -5,6 +5,7 @@ import { Modal, PurchaseImport } from "./ImportPanels";
 import { Favorites, FolderTree } from "./Favorites";
 import { SearchCard } from "./SearchCard";
 import { BarcodeCamera } from "./BarcodeCamera";
+import { SupplierManager, removeSupplierSettings } from "./SupplierManager";
 import {
   barcodeLink,
   displayPrice,
@@ -63,6 +64,7 @@ type Dialog = {
     | "unit"
     | "barcode"
     | "supplier"
+    | "suppliers"
     | "contact"
     | "new"
     | "classify"
@@ -70,7 +72,7 @@ type Dialog = {
   p?: Product;
   supplier?: string;
   mode?: string;
-  from?: "manage";
+  from?: "manage" | "suppliers";
 };
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 export default function OrderApp() {
@@ -112,6 +114,7 @@ export default function OrderApp() {
     [siteQuery, setSiteQuery] = useState(""),
     [busy, setBusy] = useState(false);
   const [newUsage, setNewUsage] = useState<Usage>("retail");
+  const [supplierQuery, setSupplierQuery] = useState("");
   const active = prefs.bookmarks.filter((b) => !b.deletedAt),
     products = useMemo(() => {
       const grouped = new Map<string, Product[]>();
@@ -136,17 +139,22 @@ export default function OrderApp() {
       ].sort((a, b) => a.localeCompare(b, "ko")),
     [snapshot],
   );
-  const namesForSite = (b: Bookmark) => [
+  const managedSuppliers = [...new Set([
+    ...suppliers,
+    ...Object.keys(prefs.suppliers),
+    ...active.flatMap((b) => b.supplierNames ?? []),
+  ])].sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
+  const namesForSite = (b?: Bookmark) => [
     ...new Set([
-      ...(b.supplierNames ?? []),
+      ...(b?.supplierNames ?? []),
       ...Object.entries(prefs.suppliers)
-        .filter(([, s]) => s.bookmarkId === b.id)
+        .filter(([, s]) => !!b && s.bookmarkId === b.id)
         .map(([n]) => n),
     ]),
   ];
   const q = normalizeName(deferred),
     supplierCandidates =
-      !scope && q ? suppliers.filter((n) => normalizeName(n).includes(q)) : [];
+      !scope && q ? managedSuppliers.filter((n) => normalizeName(n).includes(q)) : [];
   const siteCandidates =
     !scope && q
       ? active.filter((b) => normalizeName(b.title + " " + b.memo).includes(q))
@@ -260,6 +268,10 @@ export default function OrderApp() {
     setDialog(d);
   }
   function close() {
+    if (dialog?.from === "suppliers") {
+      setDialog({ kind: "suppliers", from: "manage" });
+      return;
+    }
     if (dialog?.from === "manage") setDialog({ kind: "manage" });
     else setDialog(null);
   }
@@ -407,7 +419,7 @@ export default function OrderApp() {
             phone,
           };
           const previous = p.suppliers[name]?.bookmarkId;
-          if (!onlyProduct && previous && previous !== conf.bookmarkId)
+          if (!onlyProduct && previous && previous !== conf.bookmarkId && dialog.from !== "suppliers")
             throw Error(
               "기존 연결을 유지하세요. 상품별 예외 주문처는 ‘이 상품만 적용’을 선택하여 지정할 수 있습니다.",
             );
@@ -983,6 +995,9 @@ export default function OrderApp() {
       {dialog?.kind === "manage" && (
         <Modal title="관리 · 직원 누구나 수정" onClose={close}>
           <div className="of-actions">
+            <button onClick={() => edit({ kind: "suppliers", from: "manage" })}>
+              매입처·주문 정보 관리
+            </button>
             <button onClick={() => edit({ kind: "favorites", from: "manage" })}>
               즐겨찾기 편집·가져오기
             </button>
@@ -1043,6 +1058,23 @@ export default function OrderApp() {
             ))}
           </div>
           <p className="of-muted">자료 갱신: 분기 1회 · 월 1회 목표</p>
+        </Modal>
+      )}
+      {dialog?.kind === "suppliers" && (
+        <Modal title="매입처·주문 정보 관리" onClose={close}>
+          {notice && <p role="status">{notice}</p>}
+          <SupplierManager
+            names={managedSuppliers} prefs={prefs} query={supplierQuery}
+            onQuery={setSupplierQuery} busy={busy}
+            onEdit={(name) => edit({ kind: "supplier", supplier: name, from: "suppliers" })}
+            onRemove={(name) => {
+              if (!window.confirm(`${name}의 주문 정보를 삭제할까요? 매입 이력과 즐겨찾기 사이트는 보존됩니다.`)) return;
+              void run(async () => {
+                await data.change((p) => removeSupplierSettings(p, name));
+                setNotice("주문 정보를 해제했습니다. 필요하면 다시 등록할 수 있습니다.");
+              });
+            }}
+          />
         </Modal>
       )}
       {dialog &&
@@ -1254,6 +1286,9 @@ export default function OrderApp() {
             {dialog.kind === "supplier" && (
               <>
                 <h3>{dialog.supplier}</h3>
+                {chosenSite && namesForSite(active.find((b) => b.id === chosenSite)).length > 1 && (
+                  <p className="of-muted">공통 주소를 수정하면 함께 연결된 거래처에도 반영됩니다: {namesForSite(active.find((b) => b.id === chosenSite)).join(", ")}</p>
+                )}
                 <label>
                   연결 사이트
                   <input

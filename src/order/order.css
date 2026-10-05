@@ -1844,3 +1844,8 @@
   }
 }
 .of-search input:focus-visible{outline:none}
+/* Supplier administration reuses the order editor and keeps long URLs within mobile width. */
+.of-supplier-manager-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 0; border-bottom: 1px solid #ddd; }
+.of-supplier-manager-row > div:first-child { min-width: 0; }
+.of-supplier-manager-row small { display: block; color: #666; overflow-wrap: anywhere; }
+.of-supplier-manager-row .of-actions { flex: none; }
