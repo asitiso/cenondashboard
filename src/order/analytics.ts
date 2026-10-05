@@ -16,6 +16,7 @@ export type AnalysisItem = {
   suppliers: string[];
   latestDate: string;
   frequency: number;
+  vendorDifference?: number;
   increase?: {
     current: VendorPrice;
     previous: VendorPrice;
@@ -23,6 +24,22 @@ export type AnalysisItem = {
     percent: number;
   };
 };
+const roundedPrice = (amount: number) => Math.round(amount * 100) / 100;
+export function groupVendorPrices(values: VendorPrice[]): VendorPrice[] {
+  const groups = new Map<string, VendorPrice>();
+  for (const value of values) {
+    const key = JSON.stringify([
+      roundedPrice(value.amount),
+      value.unit,
+      value.date,
+      !!value.manual,
+    ]);
+    const existing = groups.get(key);
+    if (existing) existing.supplier += ` · ${value.supplier}`;
+    else groups.set(key, { ...value });
+  }
+  return [...groups.values()];
+}
 export function buildPurchaseAnalysis(
   snapshot: Snapshot | undefined,
   prefs: Preferences,
@@ -125,6 +142,12 @@ export function buildPurchaseAnalysis(
     };
     const current = prices[0],
       previous = prices.find((r) => r.date < current?.date);
+    if (new Set(vendors.map((v) => v.supplier)).size >= 2) {
+      const amounts = vendors.map((v) => roundedPrice(v.amount));
+      item.vendorDifference = roundedPrice(
+        Math.max(...amounts) - Math.min(...amounts),
+      );
+    }
     if (current?.date >= start && previous) {
       const difference = current.amount - previous.amount;
       item.increase = {
@@ -144,7 +167,7 @@ export function buildPurchaseAnalysis(
       .filter((x) => x.increase && x.increase.difference > 0)
       .sort((a, b) => b.latestDate.localeCompare(a.latestDate)),
     gaps: items
-      .filter((x) => x.vendors.length > 0)
+      .filter((x) => (x.vendorDifference ?? 0) > 0)
       .sort((a, b) => b.latestDate.localeCompare(a.latestDate)),
     frequent: items
       .filter((x) => x.frequency > 0)

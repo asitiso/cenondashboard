@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { buildPurchaseAnalysis } from "./analytics";
+import { buildPurchaseAnalysis, groupVendorPrices } from "./analytics";
 import { emptyPreferences } from "./storage";
 import type { Product, Purchase, Snapshot } from "./types";
 const receipt = (
@@ -82,7 +82,7 @@ it("excludes future, returned, zero quantity and old vendor prices", () => {
     receipt("2024-01-01", "old", 10),
   ];
   const data = buildPurchaseAnalysis(snapshot([product(rows)]), prefs);
-  expect(data.gaps).toHaveLength(1);
+  expect(data.gaps).toEqual([]);
   expect(data.frequent[0].vendors.map((x) => x.supplier)).toEqual(["A"]);
   expect(data.frequent[0].latestDate).toBe("2026-10-01");
 });
@@ -125,6 +125,7 @@ it("includes a manual-only product in vendor prices but not change or frequency 
     ...emptyPreferences,
     referencePrices: {
       "base|Shop": { amount: 100, unit: "개", updatedAt: "2026-10-05" },
+      "base|Other": { amount: 110, unit: "개", updatedAt: "2026-10-05" },
     },
   });
   expect(data.gaps[0].vendors[0]).toMatchObject({
@@ -136,8 +137,54 @@ it("includes a manual-only product in vendor prices but not change or frequency 
   expect(data.changes).toEqual([]);
   expect(data.frequent).toEqual([]);
 });
+it("only lists products with differing displayed prices at different suppliers", () => {
+  const single = {
+    ...product([receipt("2026-10-02", "A", 100)]),
+    baseId: "single",
+  };
+  const same = {
+    ...product([
+      receipt("2026-10-02", "A", 100),
+      receipt("2026-09-01", "B", 100),
+    ]),
+    baseId: "same",
+  };
+  const precise = {
+    ...product([
+      receipt("2026-10-02", "A", 100),
+      receipt("2026-09-01", "B", 100.00000001),
+    ]),
+    baseId: "precise",
+  };
+  const differing = product([
+    receipt("2026-10-02", "A", 120),
+    receipt("2026-09-01", "B", 100),
+  ]);
+  const data = buildPurchaseAnalysis(
+    snapshot([single, same, precise, differing]),
+    emptyPreferences,
+  );
+  expect(data.gaps.map((p) => p.product.baseId)).toEqual(["base"]);
+  expect(data.gaps[0].vendorDifference).toBe(20);
+});
+it("groups equal vendor prices only when date, unit and registration source match", () => {
+  const value = { supplier: "A", amount: 100, unit: "정", date: "2026-10-02" };
+  const groups = groupVendorPrices([
+    value,
+    { ...value, supplier: "B" },
+    { ...value, supplier: "C", date: "2026-09-01" },
+    { ...value, supplier: "D", unit: "통" },
+    { ...value, supplier: "E", manual: true },
+  ]);
+  expect(groups).toHaveLength(4);
+  expect(groups[0].supplier).toBe("A · B");
+  expect(groups[1].date).toBe("2026-09-01");
+});
 it("analyzes public price-only receipts whose quantity and amount were omitted", () => {
-  const rows = [receipt("2026-10-02", "A", 120), receipt("2026-09-01", "B", 100)].map(r => ({ ...r, quantity: 0, amount: 0, sourceRow: 0 }));
+  const rows = [
+    receipt("2026-10-02", "A", 120),
+    receipt("2026-09-01", "B", 100),
+  ].map((r) => ({ ...r, quantity: 0, amount: 0, sourceRow: 0 }));
   const data = buildPurchaseAnalysis(snapshot([product(rows)]), prefs);
   expect(data.rises[0].increase?.difference).toBe(20);
   expect(data.rises[0].increase?.current.unit).toBe("단위");

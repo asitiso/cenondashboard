@@ -5,6 +5,7 @@ import type { useOrderData } from "./useOrderData";
 import {
   buildPurchaseAnalysis,
   matchesAnalysis,
+  groupVendorPrices,
   type VendorPrice,
 } from "./analytics";
 import "./analytics.css";
@@ -21,13 +22,16 @@ const percent = (n: number) =>
   Math.abs(n) > 0 && Math.abs(n) < 0.05
     ? "0.1% 미만"
     : `${Math.abs(n).toFixed(1)}%`;
-function PriceLine({ value }: { value: VendorPrice }) {
+function PriceLine({ value, label }: { value: VendorPrice; label?: string }) {
   return (
-    <span className="pa-vendor-price">
-      <span>{value.supplier}</span>
+    <span
+      className={`pa-vendor-price ${label === "직전" ? "pa-previous" : ""}`}
+    >
+      {label && <span className="pa-price-label">{label}</span>}
       <strong>
         {money(value.amount)}원 / {value.unit || "단위"}
       </strong>
+      <span>{value.supplier}</span>
       <small>{value.manual ? "직접 등록 · 날짜 없음" : value.date}</small>
     </span>
   );
@@ -177,12 +181,15 @@ export default function PurchaseAnalysis({
               {mode === "frequent"
                 ? `${analysis.start} ~ ${snapshot.asOf}의 매입 기록 수입니다. 주문 수량이나 현재 재고를 뜻하지 않습니다.`
                 : mode === "gaps"
-                  ? "최근 1년 매입처별 마지막 매입 가격과 직접 등록 가격입니다. 매입 날짜순으로 표시합니다."
+                  ? "매입처별 가격이 다른 상품만 표시합니다. 최근 1년 마지막 매입 가격과 직접 등록 가격을 비교합니다."
                   : "최근 1년 내 마지막 매입과 그보다 앞선 날짜의 매입 기록을 비교합니다. 다른 매입처도 포함합니다."}
             </p>
             <div className="pa-list">
               {filtered.slice(0, limit).map((item) => (
-                <article className="pa-row" key={item.product.baseId}>
+                <article
+                  className={`pa-row pa-${mode}`}
+                  key={item.product.baseId}
+                >
                   <div className="pa-product">
                     <button
                       className="pa-product-name"
@@ -204,36 +211,67 @@ export default function PurchaseAnalysis({
                       </small>
                     )}
                   </div>
-                  <div className="pa-info">
+                  <div className="pa-change">
                     {mode === "rises" && item.increase && (
                       <>
-                        <strong>
+                        <strong
+                          className={`pa-change-badge ${item.increase.difference > 0 ? "pa-rise" : item.increase.difference < 0 ? "pa-fall" : "pa-same"}`}
+                        >
                           {item.increase.difference === 0
                             ? "가격 동일"
-                            : `${item.increase.difference > 0 ? "▲" : "▼"} ${money(Math.abs(item.increase.difference))}원 · ${percent(item.increase.percent)} ${item.increase.difference > 0 ? "상승" : "하락"}`}
+                            : `${item.increase.difference > 0 ? "▲" : "▼"} ${percent(item.increase.percent)}`}
                         </strong>
+                        <small>
+                          {item.increase.difference === 0
+                            ? "변동 없음"
+                            : `${item.increase.difference > 0 ? "+" : "−"}${money(Math.abs(item.increase.difference))}원 ${item.increase.difference > 0 ? "상승" : "하락"}`}
+                        </small>
                         {item.increase.current.supplier !==
                           item.increase.previous.supplier && (
                           <span className="pa-tag">매입처 변경</span>
                         )}
-                        <PriceLine value={item.increase.current} />
-                        <span className="of-muted">직전 기록</span>
-                        <PriceLine value={item.increase.previous} />
                       </>
                     )}
                     {mode === "gaps" && (
                       <>
-                        {item.vendors
-                          .slice(
+                        <strong className="pa-change-badge pa-gap">
+                          {money(item.vendorDifference ?? 0)}원
+                        </strong>
+                        <small>최고·최저 가격 차이</small>
+                      </>
+                    )}
+                    {mode === "frequent" && (
+                      <>
+                        <strong className="pa-change-badge pa-same">
+                          {item.frequency.toLocaleString()}건
+                        </strong>
+                        <small>매입 기록</small>
+                      </>
+                    )}
+                  </div>
+                  <div className="pa-info">
+                    {mode === "rises" && item.increase && (
+                      <>
+                        <PriceLine value={item.increase.current} label="최근" />
+                        <PriceLine
+                          value={item.increase.previous}
+                          label="직전"
+                        />
+                      </>
+                    )}
+                    {mode === "gaps" && (
+                      <>
+                        {groupVendorPrices(
+                          item.vendors.slice(
                             0,
                             expanded.has(item.product.baseId) ? undefined : 3,
-                          )
-                          .map((value, index) => (
-                            <PriceLine
-                              key={`${value.supplier}-${index}`}
-                              value={value}
-                            />
-                          ))}
+                          ),
+                        ).map((value, index) => (
+                          <PriceLine
+                            key={`${value.supplier}-${index}`}
+                            value={value}
+                          />
+                        ))}
                         {item.vendors.length > 3 && (
                           <button
                             className="pa-expand"
@@ -257,21 +295,18 @@ export default function PurchaseAnalysis({
                     )}
                     {mode === "frequent" && (
                       <>
-                        <strong>
-                          매입 기록 {item.frequency.toLocaleString()}건
-                        </strong>
                         <small>
                           최근 매입 {item.latestDate || "날짜 없음"}
                         </small>
                       </>
                     )}
-                    <button
-                      className="pa-open"
-                      onClick={() => onInspect(item.product)}
-                    >
-                      매입처·주문 보기 ↗
-                    </button>
                   </div>
+                  <button
+                    className="pa-open"
+                    onClick={() => onInspect(item.product)}
+                  >
+                    주문 보기 ↗
+                  </button>
                 </article>
               ))}
             </div>
