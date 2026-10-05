@@ -138,16 +138,7 @@ export function SearchCard({
           {selected ? (
             <>
               <div>
-                <span
-                  className={
-                    isRecommendedPrice(selected) ? "of-recommended-price" : ""
-                  }
-                >
-                  {price(selected)}
-                </span>{" "}
-                {isRecommendedPrice(selected) && (
-                  <span className="of-recommend-badge">추천</span>
-                )}{" "}
+                {price(selected)}{" "}
                 {!expanded && rise && (
                   <span
                     className={
