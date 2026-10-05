@@ -6,6 +6,8 @@ import { Favorites, FolderTree } from "./Favorites";
 import { SearchCard } from "./SearchCard";
 import { BarcodeCamera } from "./BarcodeCamera";
 import { SupplierManager, removeSupplierSettings } from "./SupplierManager";
+import { AddSupplier } from "./AddSupplier";
+import { addProductSupplier, connectWholesaleSites, isWholesaleSite, confirmRestore } from "./additionalSuppliers";
 import {
   barcodeLink,
   displayPrice,
@@ -68,7 +70,9 @@ type Dialog = {
     | "contact"
     | "new"
     | "classify"
-    | "mall";
+    | "mall"
+    | "addSupplier"
+    | "mallSites";
   p?: Product;
   supplier?: string;
   mode?: string;
@@ -142,14 +146,18 @@ export default function OrderApp() {
   const managedSuppliers = [...new Set([
     ...suppliers,
     ...Object.keys(prefs.suppliers),
+    ...Object.values(prefs.additionalSuppliers ?? {}).flat(),
     ...active.flatMap((b) => b.supplierNames ?? []),
   ])].sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
   const namesForSite = (b?: Bookmark) => [
     ...new Set([
       ...(b?.supplierNames ?? []),
       ...Object.entries(prefs.suppliers)
-        .filter(([, s]) => !!b && s.bookmarkId === b.id)
+        .filter(([, s]) => !!b && (s.bookmarkId === b.id || s.bookmarkIds?.includes(b.id)))
         .map(([n]) => n),
+      ...Object.entries(prefs.productSuppliers ?? {})
+        .filter(([, s]) => !!b && (s.bookmarkId === b.id || s.bookmarkIds?.includes(b.id)))
+        .map(([key]) => key.slice(key.indexOf("|") + 1)),
     ]),
   ];
   const q = normalizeName(deferred),
@@ -177,6 +185,7 @@ export default function OrderApp() {
       items = products.filter(
         (p) =>
           supplierRows(p).some((r) => context.includes(r.supplier)) ||
+          (prefs.additionalSuppliers?.[p.baseId] ?? []).some(name => context.includes(name)) ||
           context.includes(p.manualSupplier ?? ""),
       );
       if (q && !exact) items = searchProducts(items, deferred, false).results;
@@ -215,6 +224,7 @@ export default function OrderApp() {
     deferred,
     prefs.barcodes,
     prefs.bookmarks,
+    prefs.additionalSuppliers,
     scope,
     sort,
     exact,
@@ -310,12 +320,12 @@ export default function OrderApp() {
     window.open(url, "_blank", "noopener,noreferrer");
     void run(() => data.click(b.id));
   }
-  function order(p: Product, name: string, selectedMode?: string) {
+  function order(p: Product, name: string, selectedMode?: string, siteId?: string) {
     const conf =
         prefs.productSuppliers?.[p.baseId + "|" + name] ??
         prefs.suppliers[name],
       link =
-        active.find((b) => b.id === conf?.bookmarkId) ??
+        active.find((b) => b.id === (siteId ?? conf?.bookmarkId)) ??
         active.find((b) => b.title === name),
       mode =
         selectedMode ??
@@ -326,6 +336,7 @@ export default function OrderApp() {
     if (mode === "사이트") {
       if (!link?.url) {
         edit({ kind: "supplier", p, supplier: name });
+        if (siteId && link) { setChosenSite(siteId); setAddress(link.url); setOnlyProduct(true); }
         return;
       }
       void copy(shortName(p, prefs));
@@ -454,7 +465,7 @@ export default function OrderApp() {
               ...new Set([...(existing?.supplierNames ?? []), name]),
             ],
           };
-          return {
+          const next = {
             ...p,
             folders,
             bookmarks: existing
@@ -472,6 +483,7 @@ export default function OrderApp() {
                   suppliers: { ...p.suppliers, [name]: conf },
                 }),
           };
+          return isWholesaleSite(site.title) ? connectWholesaleSites(next, name, onlyProduct ? product?.baseId : undefined) : next;
         }),
       )
     )
@@ -880,6 +892,8 @@ export default function OrderApp() {
                   onSupplier={(p, supplier) =>
                     edit({ kind: "supplier", p, supplier })
                   }
+                  onAddSupplier={(p) => edit({ kind: "addSupplier", p })}
+                  onChooseSite={(p, supplier) => edit({ kind: "mallSites", p, supplier })}
                   onSearchName={(p) => edit({ kind: "short", p })}
                   onUnit={(p) => edit({ kind: "unit", p })}
                   onBarcode={(p) => edit({ kind: "barcode", p })}
@@ -1018,11 +1032,7 @@ export default function OrderApp() {
                 void run(async () => {
                   const old = await readCache<Snapshot>("previousSnapshot");
                   if (!old) throw Error("복원할 직전 자료가 없습니다.");
-                  if (
-                    !window.confirm(
-                      "매입 자료를 직전 자료로 복원할까요? 즐겨찾기·바코드 설정은 유지됩니다.",
-                    )
-                  )
+                  if (!confirmRestore(text => window.confirm(text), `${old.asOf} 기준 · ${old.products.length.toLocaleString()}품목 · 저장 ${old.importedAt}`))
                     return;
                   await data.saveSnapshot({
                     ...old,
@@ -1036,6 +1046,8 @@ export default function OrderApp() {
               직전 자료 복원
             </button>
           </div>
+          {notice && <p role="status">{notice}</p>}
+          <p className="of-muted">직전 자료 복원: 이 브라우저에 보관된 이전 매입 자료로 공용 자료를 교체합니다. 즐겨찾기·바코드·주문처 설정은 유지됩니다.</p>
           <p>모바일 글자 크기 · 이 기기만 적용</p>
           <div className="of-actions">
             {[
@@ -1087,6 +1099,8 @@ export default function OrderApp() {
           "new",
           "classify",
           "mall",
+          "addSupplier",
+          "mallSites",
         ].includes(dialog.kind) && (
           <Modal
             title={
@@ -1099,11 +1113,26 @@ export default function OrderApp() {
                 new: "새 상품 등록",
                 classify: "약품코드 연결",
                 mall: "주문할 거래처 선택",
+                addSupplier: "다른 매입처 등록",
+                mallSites: "종합도매 주문처 선택",
               }[dialog.kind as "short"]
             }
             onClose={close}
           >
             {notice && <p role="status">{notice}</p>}
+            {dialog.kind === "addSupplier" && dialog.p && <AddSupplier names={managedSuppliers} existing={[...supplierRows(dialog.p).map(r => r.supplier), ...(prefs.additionalSuppliers?.[dialog.p.baseId] ?? [])]} busy={busy} onAdd={(name, wholesale) => void run(async () => {
+              await data.change(p => {
+                const next = addProductSupplier(p, dialog.p!.baseId, name);
+                return wholesale ? connectWholesaleSites(next, name, dialog.p!.baseId) : next;
+              });
+              close();
+            })} />}
+            {dialog.kind === "mallSites" && dialog.p && dialog.supplier && <div className="of-actions">
+              {((prefs.productSuppliers?.[dialog.p.baseId + "|" + dialog.supplier] ?? prefs.suppliers[dialog.supplier])?.bookmarkIds ?? []).map((id, i) => {
+                const b = active.find(site => site.id === id);
+                return b ? <button key={id} onClick={() => order(dialog.p!, dialog.supplier!, "사이트", id)}>{b.title}{i === 0 ? " · 기본" : ""}{!b.url ? " · 주소 등록 필요" : " ↗"}</button> : null;
+              })}
+            </div>}
             {dialog.kind === "mall" && dialog.p && (
               <div className="of-actions">
                 {supplierRows(dialog.p)

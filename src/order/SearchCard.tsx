@@ -19,6 +19,8 @@ export type CardProps = {
   onOrder: (p: Product, supplier: string, method?: string) => void;
   onScopeOrder: (p: Product, supplier: string) => void;
   onSupplier: (p: Product, name: string) => void;
+  onAddSupplier: (p: Product) => void;
+  onChooseSite: (p: Product, name: string) => void;
   onSearchName: (p: Product) => void;
   onUnit: (p: Product) => void;
   onBarcode: (p: Product) => void;
@@ -35,6 +37,8 @@ export function SearchCard({
   onOrder,
   onScopeOrder,
   onSupplier,
+  onAddSupplier,
+  onChooseSite,
   onSearchName,
   onUnit,
   onBarcode,
@@ -131,6 +135,7 @@ export function SearchCard({
                   : "미분류"}
             </span>
             <div className="of-actions">
+              <button onClick={() => onAddSupplier(p)}>다른 매입처 등록</button>
               <button onClick={() => onUnit(p)}>단위 설정</button>
               <button onClick={() => onBarcode(p)}>
                 {pending ? "바코드 연결" : "바코드 관리"}
@@ -235,7 +240,7 @@ export function SearchCard({
                     {price(r)}
                     <small>매입 {r.date}</small>
                   </div>
-                  <button
+                  <div className="of-vendor-order"><button
                     className="of-primary of-order"
                     onClick={() =>
                       hasOrder(r.supplier)
@@ -249,6 +254,8 @@ export function SearchCard({
                         : methods[0]
                       : "주소 등록"}
                   </button>
+                  {(config?.bookmarkIds?.length ?? 0) > 1 && <button onClick={() => onChooseSite(p, r.supplier)}>주문처 선택</button>}
+                  </div>
                 </div>
                 {history === r.supplier && (
                   <div className="of-history">
@@ -287,7 +294,18 @@ export function SearchCard({
               </div>
             );
           })}
-          {!rows.length && (
+          {[...new Set([...(prefs.additionalSuppliers?.[p.baseId] ?? []), ...(p.manualSupplier ? [p.manualSupplier] : [])])].filter(name => !rows.some(r => r.supplier === name)).map(name => (
+            <div className="of-vendor-wrap" key={name}>
+              <div className="of-vendor">
+                <div><button className="of-vendor-name" onClick={() => onSupplier(p, name)}>{name}</button><small className="of-muted">등록한 매입처 · 매입 기록 없음</small></div>
+                <div className="of-price"><small>가격·날짜 미등록</small></div>
+                <div className="of-vendor-order"><button className="of-primary of-order" onClick={() => hasOrder(name) ? onOrder(p, name) : onSupplier(p, name)}>{hasOrder(name) ? "바로주문 ↗" : "주소 등록"}</button>
+                {(supplierSetting(name)?.bookmarkIds?.length ?? 0) > 1 && <button onClick={() => onChooseSite(p, name)}>주문처 선택</button>}
+                </div>
+              </div>
+            </div>
+          ))}
+          {!rows.length && !prefs.additionalSuppliers?.[p.baseId]?.length && (
             <div className="of-empty">
               매입 이력이 없습니다.
               {p.manualSupplier && (

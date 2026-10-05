@@ -90,12 +90,14 @@ export interface UsageDay {
 }
 export interface SupplierSetting {
   bookmarkId?: string;
+  bookmarkIds?: string[];
   phone?: string;
   methods?: string[];
   method: "사이트" | "전화" | "카카오톡·문자" | "기타";
   memo: string;
 }
 export interface Preferences {
+  additionalSuppliers?: Record<string, string[]>;
   barcodes?: Record<string, string[]>;
   searchNames?: Record<string, string>;
   productSuppliers?: Record<string, SupplierSetting>;

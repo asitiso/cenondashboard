@@ -8,6 +8,7 @@ export function removeSupplierSettings(prefs: Preferences, name: string): Prefer
   return {
     ...prefs,
     suppliers,
+    additionalSuppliers: Object.fromEntries(Object.entries(prefs.additionalSuppliers ?? {}).map(([id, names]) => [id, names.filter(n => n !== name)])),
     productSuppliers: Object.fromEntries(
       Object.entries(prefs.productSuppliers ?? {}).filter(([key]) => key.slice(key.indexOf("|") + 1) !== name),
     ),
