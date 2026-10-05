@@ -15,7 +15,7 @@ it("unlinks only the selected supplier, preserving shared sites and unrelated pr
   expect(next.suppliers).toEqual({ 복산: conf });
   expect(next.additionalSuppliers).toEqual({ p1: ["복산"] });
   expect(next.productSuppliers).toEqual({ "p2|복산": conf, "p3|다른|백제": conf });
-  expect(next.bookmarks[0]).toEqual({ ...prefs.bookmarks[0], supplierNames: ["복산"] });
+  expect(next.bookmarks).toEqual(prefs.bookmarks);
   expect(prefs.suppliers.백제).toEqual(conf);
   expect(prefs.bookmarks[0].supplierNames).toEqual(["백제", "복산"]);
 });

@@ -76,6 +76,14 @@ export function useOrderData() {
               void writeCache("preferences", separated).catch((e) =>
                 setError(String(e)),
               );
+              if (separated !== v) {
+                const task = mutationQueue.current.catch(() => {}).then(async () => {
+                  const saved = await mutatePreferences(prefRef.current, separateAutomaticSites);
+                  if (live) { prefRef.current = saved; setPreferences(saved); }
+                });
+                mutationQueue.current = task;
+                void task.catch(e => setError(e instanceof Error ? e.message : String(e)));
+              }
             }
           }, setError),
           watchUsage(

@@ -8,7 +8,7 @@ import { BarcodeCamera } from "./BarcodeCamera";
 import { SupplierManager, removeSupplierSettings } from "./SupplierManager";
 import { AddSupplier } from "./AddSupplier";
 import { registerProductSupplier, connectWholesaleSites, isWholesaleSite, confirmRestore } from "./additionalSuppliers";
-import { allOrderSites, saveOrderSite } from "./orderSites";
+import { allOrderSites, connectionSites, saveOrderSite } from "./orderSites";
 import { SiteButton } from "./SiteButton";
 import { toggleSitePin } from "./quickPin";
 import {
@@ -122,6 +122,7 @@ export default function OrderApp() {
     [busy, setBusy] = useState(false);
   const [newUsage, setNewUsage] = useState<Usage>("retail");
   const [supplierQuery, setSupplierQuery] = useState("");
+  const supplierScroll = useRef(0);
   const active = prefs.bookmarks.filter((b) => !b.deletedAt),
     orderSites = allOrderSites(prefs),
     products = useMemo(() => {
@@ -151,7 +152,6 @@ export default function OrderApp() {
     ...suppliers,
     ...Object.keys(prefs.suppliers),
     ...Object.values(prefs.additionalSuppliers ?? {}).flat(),
-    ...active.flatMap((b) => b.supplierNames ?? []),
   ])].sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
   const namesForSite = (b?: Bookmark) => [
     ...new Set([
@@ -169,7 +169,7 @@ export default function OrderApp() {
       !scope && q ? managedSuppliers.filter((n) => normalizeName(n).includes(q)) : [];
   const siteCandidates =
     !scope && q
-      ? orderSites.filter((b) => normalizeName(b.title + " " + b.memo).includes(q))
+      ? connectionSites(prefs).filter((b) => normalizeName(b.title + " " + b.memo).includes(q))
       : [];
   const exact = supplierCandidates.find((n) => normalizeName(n) === q);
   const context = scope?.names ?? (exact ? [exact] : []);
@@ -319,6 +319,11 @@ export default function OrderApp() {
   function openSite(b: Bookmark) {
     const url = safeUrl(b.url);
     if (!url) {
+      if (active.some(site => site.id === b.id)) {
+        edit({ kind: "favorites" });
+        setNotice("즐겨찾기 편집에서 사이트 주소를 입력해 주세요.");
+        return;
+      }
       edit({ kind: "supplier", supplier: b.supplierNames?.[0] ?? b.title });
       return;
     }
@@ -448,7 +453,7 @@ export default function OrderApp() {
           const productSuppliers = { ...p.productSuppliers };
           if (!onlyProduct && product)
             delete productSuppliers[product.baseId + "|" + name];
-          const existing = allOrderSites(p).find((b) => b.id === conf.bookmarkId);
+          const existing = connectionSites(p).find((b) => b.id === conf.bookmarkId);
           const site: Bookmark = {
             ...existing,
             id: conf.bookmarkId!,
@@ -1061,7 +1066,7 @@ export default function OrderApp() {
         </Modal>
       )}
       {dialog?.kind === "suppliers" && (
-        <Modal title="매입처·주문 정보 관리" onClose={close}>
+        <Modal title="매입처·주문 정보 관리" onClose={close} initialScrollTop={supplierScroll.current} onScrollTop={top => { supplierScroll.current = top; }}>
           {notice && <p role="status">{notice}</p>}
           <SupplierManager
             names={managedSuppliers} prefs={prefs} query={supplierQuery}
@@ -1319,13 +1324,13 @@ export default function OrderApp() {
                     value={chosenSite}
                     onChange={(e) => {
                       setChosenSite(e.target.value);
-                      const site = orderSites.find((b) => b.id === e.target.value);
+                      const site = connectionSites(prefs).find((b) => b.id === e.target.value);
                       setAddress(site?.url ?? "");
                       setPhone(site?.phone ?? "");
                     }}
                   >
                     <option value="">새 주문처 등록</option>
-                    {orderSites
+                    {connectionSites(prefs)
                       .filter((b) =>
                         b.id === chosenSite ||
                         normalizeName(b.title).includes(normalizeName(siteQuery)),

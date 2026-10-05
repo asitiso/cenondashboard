@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { parseBookmarks, selectedBookmarkTree } from "./bookmarks";
 import { todayKorea, yearStart } from "./core";
 import type {
@@ -14,17 +14,24 @@ export function Modal({
   title,
   onClose,
   children,
+  initialScrollTop,
+  onScrollTop,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  initialScrollTop?: number;
+  onScrollTop?: (top: number) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  useLayoutEffect(() => {
+    if (ref.current && initialScrollTop !== undefined) ref.current.scrollTop = initialScrollTop;
+  }, [initialScrollTop]);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    ref.current?.focus();
+    ref.current?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeRef.current();
       if (e.key === "Tab") {
@@ -48,7 +55,7 @@ export function Modal({
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
-      previous?.focus();
+      previous?.focus({ preventScroll: true });
     };
   }, []);
   return (
@@ -65,6 +72,7 @@ export function Modal({
         aria-label={title}
         ref={ref}
         tabIndex={-1}
+        onScroll={(e) => onScrollTop?.(e.currentTarget.scrollTop)}
       >
         <div className="order-modal-heading">
           <h2>{title}</h2>

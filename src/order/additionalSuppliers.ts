@@ -1,6 +1,6 @@
 import { normalizeName, stableId } from "./core";
 import type { Preferences } from "./types";
-import { allOrderSites, saveOrderSite } from "./orderSites";
+import { connectionSites, saveOrderSite } from "./orderSites";
 
 export const wholesaleTitles = ["HMP몰", "바로팜", "theSHOP"];
 export const isWholesaleSite = (title: string) => wholesaleTitles.some(t => normalizeName(t) === normalizeName(title));
@@ -12,11 +12,12 @@ export function addProductSupplier(p: Preferences, id: string, name: string): Pr
 export function connectWholesaleSites(p: Preferences, name: string, productId?: string): Preferences {
   let next = p;
   const ids = wholesaleTitles.map(title => {
-    let site = allOrderSites(next).find(b => normalizeName(b.title) === normalizeName(title));
+    let site = connectionSites(next).find(b => normalizeName(b.title) === normalizeName(title));
     if (!site) {
       site = { id: stableId("wholesale|" + title), title, url: "", folderId: "", category: "종합도매", memo: "" };
-      next = saveOrderSite(next, site);
     }
+    const { deletedAt: _deleted, rank: _rank, favoriteExplicit: _explicit, ...orderSite } = site;
+    next = saveOrderSite(next, orderSite);
     return site.id;
   });
   const key = productId + "|" + name;

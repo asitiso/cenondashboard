@@ -14,10 +14,6 @@ export function removeSupplierSettings(prefs: Preferences, name: string): Prefer
     productSuppliers: Object.fromEntries(
       Object.entries(prefs.productSuppliers ?? {}).filter(([key]) => key.slice(key.indexOf("|") + 1) !== name),
     ),
-    bookmarks: prefs.bookmarks.map((b) => ({
-      ...b,
-      ...(b.supplierNames ? { supplierNames: b.supplierNames.filter((n) => n !== name) } : {}),
-    })),
   };
 }
 

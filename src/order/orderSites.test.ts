@@ -22,3 +22,17 @@ it("separates previously generated favorites without losing supplier addresses o
   expect(allOrderSites(next).find(b => b.id === auto.id)?.url).toBe(auto.url);
   expect(separateAutomaticSites(next)).toEqual(next);
 });
+it("keeps supplier links and addresses after a favorite is edited, trashed, or removed", () => {
+  const site = { id: "shared", title: "사이트", url: "https://original.example.com", folderId: "f", category: "기타", memo: "" };
+  const conf = { bookmarkId: site.id, method: "사이트" as const, memo: "" };
+  const migrated = separateAutomaticSites({ ...emptyPreferences, bookmarks: [site], suppliers: { 거래처: conf }, productSuppliers: { "p|거래처": conf } });
+  for (const bookmarks of [[{ ...site, url: "https://favorite.example.com" }], [{ ...site, deletedAt: "2026-10-05" }], []]) {
+    const next = separateAutomaticSites({ ...migrated, bookmarks });
+    expect(allOrderSites(next).find(b => b.id === site.id)?.url).toBe(site.url);
+    expect(next.suppliers.거래처).toEqual(conf);
+    expect(next.productSuppliers?.["p|거래처"]).toEqual(conf);
+  }
+  const edited = saveOrderSite(migrated, { ...site, url: "https://supplier.example.com" });
+  expect(edited.bookmarks).toEqual([site]);
+  expect(allOrderSites(edited)[0].url).toBe("https://supplier.example.com");
+});
