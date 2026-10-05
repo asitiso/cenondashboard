@@ -1675,6 +1675,11 @@ h2 {
     text-align: left;
   }
 
+  .app-shell .drug-row {
+    min-height: 50px;
+    grid-template-rows: minmax(18px, auto) minmax(17px, auto);
+  }
+
   .row-meta {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     justify-items: start;
