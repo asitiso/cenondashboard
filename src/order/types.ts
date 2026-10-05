@@ -93,6 +93,7 @@ export interface UsageDay {
 export interface SupplierSetting {
   bookmarkId?: string;
   bookmarkIds?: string[];
+  wholesaleTarget?: "choose" | "HMP몰" | "바로팜" | "theSHOP";
   phone?: string;
   methods?: string[];
   method: "사이트" | "전화" | "카카오톡·문자" | "기타";
