@@ -106,10 +106,9 @@ export function SearchCard({
     const config = supplierSetting(name);
     const linkedSites = [config?.bookmarkId, ...(config?.bookmarkIds ?? [])]
       .filter((id): id is string => !!id)
-      .map((id) => orderSites.find((b) => b.id === id))
-      .filter((b): b is NonNullable<typeof b> => !!b);
+      .map((id) => orderSites.find((b) => b.id === id));
     return (
-      linkedSites.some((b) => !!b.url || !!b.phone) ||
+      linkedSites.some((b) => !!b?.url || !!b?.phone) ||
       !!config?.phone
     );
   };
