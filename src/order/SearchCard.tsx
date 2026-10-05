@@ -30,6 +30,17 @@ export type CardProps = {
   onBarcode: (p: Product) => void;
   onClassify: (p: Product) => void;
 };
+function monthsBefore(date: string, months: number) {
+  const [year, month, day] = date.split("-").map(Number);
+  const monthIndex = month - 1 - months;
+  const targetYear = year + Math.floor(monthIndex / 12);
+  const targetMonth = ((monthIndex % 12) + 12) % 12;
+  const maxDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  return `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}-${String(
+    Math.min(day, maxDay),
+  ).padStart(2, "0")}`;
+}
+
 export function SearchCard({
   product: p,
   preferences: prefs,
@@ -58,7 +69,20 @@ export function SearchCard({
       ? rows.find((r) => scope.includes(r.supplier))
       : rows[0],
     rise = priceIncrease(p, setting),
-    drop = priceDecrease(p, setting);
+    drop = priceDecrease(p, setting),
+    sixMonthStart = monthsBefore(asOf, 6),
+    recentRows = rows.filter(
+      (r) => r.date >= sixMonthStart && r.date <= asOf,
+    ),
+    recentPrices = recentRows
+      .map((r) => displayPrice(r, setting, p.usage).amount)
+      .filter((amount) => amount > 0),
+    lowestRecentPrice = recentPrices.length ? Math.min(...recentPrices) : null;
+  const isRecommendedPrice = (r: Purchase) =>
+    lowestRecentPrice !== null &&
+    r.date >= sixMonthStart &&
+    r.date <= asOf &&
+    displayPrice(r, setting, p.usage).amount === lowestRecentPrice;
   const supplierSetting = (name: string) =>
     prefs.productSuppliers?.[p.baseId + "|" + name] ?? prefs.suppliers[name];
   const referenceSupplier = [...(prefs.additionalSuppliers?.[p.baseId] ?? []), ...(p.manualSupplier ? [p.manualSupplier] : [])]
@@ -96,7 +120,16 @@ export function SearchCard({
           {selected ? (
             <>
               <div>
-                {price(selected)}{" "}
+                <span
+                  className={
+                    isRecommendedPrice(selected) ? "of-recommended-price" : ""
+                  }
+                >
+                  {price(selected)}
+                </span>{" "}
+                {isRecommendedPrice(selected) && (
+                  <span className="of-recommend-badge">추천</span>
+                )}{" "}
                 {!expanded && rise && (
                   <span
                     className={
@@ -249,8 +282,16 @@ export function SearchCard({
                     </div>
                     {prefs.supplierNotes?.[p.baseId + "|" + r.supplier] && <small className="of-muted">{prefs.supplierNotes[p.baseId + "|" + r.supplier]}</small>}
                   </div>
-                  <div className="of-price">
-                    {price(r)}
+                  <div
+                    className={
+                      "of-price " +
+                      (isRecommendedPrice(r) ? "of-price-recommended" : "")
+                    }
+                  >
+                    <span>{price(r)}</span>
+                    {isRecommendedPrice(r) && (
+                      <span className="of-recommend-badge">추천</span>
+                    )}
                     <small>매입 {r.date}</small>
                   </div>
                   <div className="of-vendor-order"><button
