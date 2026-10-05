@@ -1067,7 +1067,7 @@ export default function OrderApp() {
         </Modal>
       )}
       {dialog?.kind === "suppliers" && (
-        <Modal title="매입처·주문 정보 관리" onClose={close} initialScrollTop={supplierScroll.current}>
+        <Modal title="매입처·주문 정보 관리" onClose={close} initialScrollTop={supplierScroll.current} backToTop>
           {notice && <p role="status">{notice}</p>}
           <SupplierManager
             names={managedSuppliers} prefs={prefs} query={supplierQuery}

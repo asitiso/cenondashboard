@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ArrowUp } from "lucide-react";
 import { parseBookmarks, selectedBookmarkTree } from "./bookmarks";
 import { todayKorea, yearStart } from "./core";
 import type {
@@ -16,18 +17,22 @@ export function Modal({
   children,
   initialScrollTop,
   onScrollTop,
+  backToTop = false,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
   initialScrollTop?: number;
   onScrollTop?: (top: number) => void;
+  backToTop?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [showTop, setShowTop] = useState(false);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useLayoutEffect(() => {
     if (ref.current && initialScrollTop !== undefined) ref.current.scrollTop = initialScrollTop;
+    setShowTop((ref.current?.scrollTop ?? 0) > 200);
   }, [initialScrollTop]);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -72,7 +77,10 @@ export function Modal({
         aria-label={title}
         ref={ref}
         tabIndex={-1}
-        onScroll={(e) => onScrollTop?.(e.currentTarget.scrollTop)}
+        onScroll={(e) => {
+          onScrollTop?.(e.currentTarget.scrollTop);
+          if (backToTop) setShowTop(e.currentTarget.scrollTop > 200);
+        }}
       >
         <div className="order-modal-heading">
           <h2>{title}</h2>
@@ -86,6 +94,20 @@ export function Modal({
           </button>
         </div>
         {children}
+        {backToTop && showTop && (
+          <button
+            type="button"
+            className="of-back-top"
+            aria-label="매입처 목록 맨 위로"
+            title="맨 위로"
+            onClick={() => ref.current?.scrollTo({
+              top: 0,
+              behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+            })}
+          >
+            <ArrowUp size={22} />
+          </button>
+        )}
       </div>
     </div>
   );
