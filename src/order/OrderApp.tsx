@@ -9,7 +9,7 @@ import { SupplierManager, removeSupplierSettings } from "./SupplierManager";
 import { AddSupplier } from "./AddSupplier";
 import { registerProductSupplier, connectWholesaleSites, isWholesaleSite, confirmRestore } from "./additionalSuppliers";
 import { allOrderSites, connectionSites, copiedSupplierSite, saveOrderSite } from "./orderSites";
-import { editManualProduct, isManualProduct, isProductSite, saveProductSupplierInfo } from "./productSettings";
+import { editManualProduct, isManualProduct, isProductSite, saveProductSupplierInfo, renameRegisteredSupplier } from "./productSettings";
 import { formatPhone } from "./phone";
 import { SiteButton } from "./SiteButton";
 import { toggleSitePin } from "./quickPin";
@@ -118,6 +118,7 @@ export default function OrderApp() {
     [registeredPrice, setRegisteredPrice] = useState(""),
     [registeredUnit, setRegisteredUnit] = useState("개"),
     [productNote, setProductNote] = useState(""),
+    [registeredSupplierName, setRegisteredSupplierName] = useState(""),
     [phone, setPhone] = useState(""),
     [method, setMethod] = useState("사이트"),
     [extra, setExtra] = useState(""),
@@ -137,7 +138,10 @@ export default function OrderApp() {
       for (const original of snapshot?.products ?? []) {
         const change = prefs.manualProductEdits?.[original.baseId];
         if (change?.deleted && isManualProduct(original)) continue;
-        const p = change?.name && isManualProduct(original) ? { ...original, name: change.name } : original;
+        const p = { ...original,
+          ...(change?.name && isManualProduct(original) ? { name: change.name } : {}),
+          ...(original.manualSupplier && prefs.manualSupplierNames?.[original.baseId] ? { manualSupplier: prefs.manualSupplierNames[original.baseId] } : {}),
+        };
         grouped.set(p.baseId, [...(grouped.get(p.baseId) ?? []), p]);
       }
       return [...grouped.values()]
@@ -145,7 +149,7 @@ export default function OrderApp() {
           usage === "all" ? list[0] : list.find((p) => p.usage === usage),
         )
         .filter((p): p is Product => !!p);
-    }, [snapshot, usage, prefs.manualProductEdits]);
+    }, [snapshot, usage, prefs.manualProductEdits, prefs.manualSupplierNames]);
   const suppliers = useMemo(
     () =>
       [
@@ -162,6 +166,7 @@ export default function OrderApp() {
   const managedSuppliers = [...new Set([
     ...suppliers,
     ...Object.keys(prefs.suppliers),
+    ...Object.values(prefs.manualSupplierNames ?? {}),
     ...Object.values(prefs.additionalSuppliers ?? {}).flat(),
   ])].sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
   const namesForSite = (b?: Bookmark) => [
@@ -291,6 +296,7 @@ export default function OrderApp() {
       setRegisteredPrice(reference ? String(reference.amount) : "");
       setRegisteredUnit(reference?.unit ?? prefs.units[d.p?.baseId ?? ""]?.baseUnit ?? "개");
       setProductNote(prefs.supplierNotes?.[d.p?.baseId + "|" + d.supplier] ?? "");
+      setRegisteredSupplierName(d.supplier ?? "");
       setOnlyProduct(
         (!!d.p && isProductSite(d.supplier + " " + (link?.title ?? "") + " " + (link?.url ?? ""))) || !!prefs.productSuppliers?.[d.p?.baseId + "|" + d.supplier],
       );
@@ -443,7 +449,7 @@ export default function OrderApp() {
     if (!dialog?.supplier) return;
     const name = dialog.supplier,
       product = dialog.p;
-    const productOnly = !!product && (onlyProduct || isProductSite(name + " " + address + " " + (connectionSites(prefs).find(b => b.id === chosenSite)?.title ?? "")));
+    const productOnly = !!product && (onlyProduct || registeredSupplierName.trim() !== name || isProductSite(name + " " + address + " " + (connectionSites(prefs).find(b => b.id === chosenSite)?.title ?? "")));
     const url = address.trim() ? safeUrl(address) : "";
     if (address.trim() && !url) {
       setNotice("http 또는 https 주소를 입력하세요.");
@@ -500,7 +506,10 @@ export default function OrderApp() {
                 }),
           };
           const withInfo = product ? saveProductSupplierInfo(next, product, name, registeredPrice, registeredUnit, productNote) : next;
-          return isWholesaleSite(site.title) ? connectWholesaleSites(withInfo, name, productOnly ? product?.baseId : undefined) : withInfo;
+          const connected = isWholesaleSite(site.title) ? connectWholesaleSites(withInfo, name, productOnly ? product?.baseId : undefined) : withInfo;
+          return product && !supplierRows(product).some(row => row.supplier === name)
+            ? renameRegisteredSupplier(connected, product, name, registeredSupplierName)
+            : connected;
         }),
       )
     )
@@ -775,7 +784,7 @@ export default function OrderApp() {
                                 (p) =>
                                   supplierRows(p).some(
                                     (r) => r.supplier === name,
-                                  ) || p.manualSupplier === name || (prefs.additionalSuppliers?.[p.baseId] ?? []).includes(name),
+                                  ) || (prefs.manualSupplierNames?.[p.baseId] ?? p.manualSupplier) === name || (prefs.additionalSuppliers?.[p.baseId] ?? []).includes(name),
                               )
                               .reduce(
                                 (s, p) => s.add(p.baseId),
@@ -1399,6 +1408,8 @@ export default function OrderApp() {
                 </label>
                 {dialog.p && !supplierRows(dialog.p).some(r => r.supplier === dialog.supplier) && (
                   <>
+                    <label>매입처 이름<input value={registeredSupplierName} onChange={e => setRegisteredSupplierName(e.target.value)} /></label>
+                    <p className="of-muted">이 상품에 등록한 매입처 이름만 변경합니다.</p>
                     <p className="of-muted">직접 등록한 가격이며 실제 매입 이력에는 추가하지 않습니다.</p>
                     <label>등록 가격 (원)<input aria-label="등록 가격" inputMode="decimal" value={registeredPrice} onChange={e => setRegisteredPrice(e.target.value)} placeholder="가격 입력 · 비우면 해제" /></label>
                     <label>가격 단위<input aria-label="가격 단위" value={registeredUnit} onChange={e => setRegisteredUnit(e.target.value)} placeholder="개·롤·박스 등" /></label>

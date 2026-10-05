@@ -100,6 +100,7 @@ export interface SupplierSetting {
 }
 export interface Preferences {
   manualProductEdits?: Record<string, { name?: string; deleted?: boolean }>;
+  manualSupplierNames?: Record<string, string>;
   referencePrices?: Record<string, { amount: number; unit: string; updatedAt: string }>;
   supplierNotes?: Record<string, string>;
   orderSites?: Bookmark[];
