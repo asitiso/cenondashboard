@@ -136,6 +136,13 @@ it("includes a manual-only product in vendor prices but not change or frequency 
   expect(data.changes).toEqual([]);
   expect(data.frequent).toEqual([]);
 });
+it("analyzes public price-only receipts whose quantity and amount were omitted", () => {
+  const rows = [receipt("2026-10-02", "A", 120), receipt("2026-09-01", "B", 100)].map(r => ({ ...r, quantity: 0, amount: 0, sourceRow: 0 }));
+  const data = buildPurchaseAnalysis(snapshot([product(rows)]), prefs);
+  expect(data.rises[0].increase?.difference).toBe(20);
+  expect(data.rises[0].increase?.current.unit).toBe("단위");
+  expect(data.gaps[0].vendors).toHaveLength(2);
+});
 it("deduplicates usage variants and hides deleted manual products", () => {
   const p = product([
     receipt("2026-10-02", "A", 120),

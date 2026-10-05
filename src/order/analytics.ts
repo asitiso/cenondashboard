@@ -60,8 +60,8 @@ export function buildPurchaseAnalysis(
         return (
           /^\d{4}-\d{2}-\d{2}$/.test(r.date) &&
           r.date <= snapshot!.asOf &&
-          r.quantity > 0 &&
-          r.amount > 0 &&
+          ((r.quantity > 0 && r.amount > 0) ||
+            (r.sourceRow === 0 && r.quantity === 0 && r.amount === 0)) &&
           r.unitPrice > 0 &&
           [r.quantity, r.amount, r.unitPrice].every(Number.isFinite)
         );
