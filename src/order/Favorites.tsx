@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { Bookmark, BookmarkFolder, Preferences } from "./types";
 import { Modal, BookmarkImport } from "./ImportPanels";
 import { normalizeName, pinBookmark, safeUrl } from "./core";
@@ -67,6 +67,26 @@ export function Favorites({
   const [panel, setPanel] = useState<
     "root" | "folder" | "site" | "import" | "delete" | "trash"
   >("root");
+  const [query, setQuery] = useState("");
+  const folderList = useRef<HTMLDivElement>(null);
+  const siteList = useRef<HTMLDivElement>(null);
+  const listPosition = useRef({ modal: 0, folders: 0, sites: 0 });
+  function openPanel(next: typeof panel) {
+    if (panel === "root") {
+      listPosition.current = {
+        modal: siteList.current?.closest<HTMLElement>('[role="dialog"]')?.scrollTop ?? 0,
+        folders: folderList.current?.scrollTop ?? 0,
+        sites: siteList.current?.scrollTop ?? 0,
+      };
+    }
+    setPanel(next);
+  }
+  useLayoutEffect(() => {
+    if (panel === "root") {
+      if (folderList.current) folderList.current.scrollTop = listPosition.current.folders;
+      if (siteList.current) siteList.current.scrollTop = listPosition.current.sites;
+    }
+  }, [panel]);
   const [folder, setFolder] = useState<Partial<BookmarkFolder>>({});
   const [site, setSite] = useState<Partial<Bookmark>>({});
   const [error, setError] = useState("");
@@ -218,7 +238,7 @@ export function Favorites({
             <button
               onClick={() => {
                 setFolder({ parentId: f.id });
-                setPanel("folder");
+                openPanel("folder");
               }}
             >
               +
@@ -226,7 +246,7 @@ export function Favorites({
             <button
               onClick={() => {
                 setFolder(f);
-                setPanel("folder");
+                openPanel("folder");
               }}
             >
               수정
@@ -234,7 +254,7 @@ export function Favorites({
             <button
               onClick={() => {
                 setFolder(f);
-                setPanel("delete");
+                openPanel("delete");
               }}
             >
               삭제
@@ -274,6 +294,7 @@ export function Favorites({
                 ? "삭제된 사이트"
                 : "사이트·주문처 편집"
       }
+      initialScrollTop={panel === "root" ? listPosition.current.modal : 0}
       onClose={panel === "root" ? onClose : back}
     >
       {error && (
@@ -285,11 +306,11 @@ export function Favorites({
       {panel === "root" && (
         <>
           <div className="of-actions">
-            <button onClick={() => setPanel("import")}>가져오기</button>
+            <button onClick={() => openPanel("import")}>가져오기</button>
             <button
               onClick={() => {
                 setFolder({ parentId: null });
-                setPanel("folder");
+                openPanel("folder");
               }}
             >
               + 폴더
@@ -297,18 +318,18 @@ export function Favorites({
             <button
               onClick={() => {
                 setSite({ folderId: selected?.id });
-                setPanel("site");
+                openPanel("site");
               }}
             >
               + 사이트
             </button>
-            <button onClick={() => setPanel("trash")}>휴지통</button>
+            <button onClick={() => openPanel("trash")}>휴지통</button>
           </div>
           <p className="of-muted">
             폴더 위·아래 가장자리는 순서 변경, 가운데는 하위 폴더로 이동합니다.
           </p>
           <div className="of-edit-layout">
-            <div className="of-folder-tree">
+            <div className="of-folder-tree" ref={folderList}>
               <div
                 data-of-folder="root"
                 className={
@@ -320,10 +341,16 @@ export function Favorites({
               </div>
               {tree(null)}
             </div>
-            <div className="of-edit-sites">
+            <div className="of-edit-sites" ref={siteList}>
               {selected && (
                 <>
                   <h3>{selected.name}</h3>
+                  <input
+                    aria-label="즐겨찾기 검색"
+                    placeholder="이 폴더의 사이트 이름·주소 검색"
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                  />
                   <details>
                     <summary>폴더 위치 변경</summary>
                     <div className="of-actions">
@@ -370,7 +397,7 @@ export function Favorites({
                     </div>
                   </details>
                   {active
-                    .filter((b) => b.folderId === selected.id)
+                    .filter((b) => b.folderId === selected.id && normalizeName([b.title, b.url, b.memo].join(" ")).includes(normalizeName(query)))
                     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
                     .map((b, i, items) => (
                       <div
@@ -405,7 +432,7 @@ export function Favorites({
                           <button
                             onClick={() => {
                               setSite(b);
-                              setPanel("site");
+                              openPanel("site");
                             }}
                           >
                             수정
