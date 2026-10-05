@@ -33,6 +33,9 @@ import { shouldShowChangeInList } from "./lib/changeStatus";
 import { getDrugStatusLabel, type DrugStatusLabel } from "./lib/drugStatus";
 import type { ManualImproveInput } from "./lib/firebase";
 import OrderApp, { TopNavigation } from "./order/OrderApp";
+import PurchaseAnalysis from "./order/PurchaseAnalysis";
+import { useOrderData } from "./order/useOrderData";
+import type { Product } from "./order/types";
 import {
   formatKoreanDate,
   formatManualDetailTextForDisplay,
@@ -836,10 +839,14 @@ function ListView({
 }
 
 export default function App() {
-  const [active, setActive] = useState<"order" | "operations">("order");
+  const [active, setActive] = useState<"order" | "operations" | "analysis">("order");
+  const data = useOrderData();
+  const [focusProduct, setFocusProduct] = useState<{ product: Product; token: number }>();
   const [visitedOperations, setVisitedOperations] = useState(false);
-  const navigate = (value: "order" | "operations") => {
+  const [visitedAnalysis, setVisitedAnalysis] = useState(false);
+  const navigate = (value: "order" | "operations" | "analysis") => {
     if (value === "operations") setVisitedOperations(true);
+    if (value === "analysis") setVisitedAnalysis(true);
     setActive(value);
   };
   return <>
@@ -847,7 +854,12 @@ export default function App() {
       <strong>센트럴온누리약국</strong>
       <TopNavigation active={active} onNavigate={navigate} />
     </header>
-    <div hidden={active !== "order"}><OrderApp /></div>
+    <div hidden={active !== "order"}><OrderApp data={data} focusProduct={focusProduct} /></div>
+    {visitedAnalysis && <div hidden={active !== "analysis"}><PurchaseAnalysis data={data} onInspect={product => {
+      setFocusProduct(value => ({ product, token: (value?.token ?? 0) + 1 }));
+      setActive("order");
+      window.scrollTo({ top: 0, behavior: "instant" });
+    }} /></div>}
     {visitedOperations && <div hidden={active !== "operations"}><OperationsDashboard /></div>}
   </>;
 }

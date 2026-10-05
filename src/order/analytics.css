@@ -1,0 +1,182 @@
+.pa-main {
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 20px;
+}
+.pa-main .of-heading h1 {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.pa-main .of-heading > small {
+  width: auto;
+}
+.pa-modes {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0 12px;
+  flex-wrap: wrap;
+}
+.pa-modes button {
+  padding: 8px 12px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.pa-modes strong {
+  font-weight: 500;
+}
+.pa-filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.pa-filters .of-search {
+  flex: 1;
+  margin: 0;
+}
+.pa-filters > label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.pa-filters select {
+  max-width: 240px;
+  border: 1px solid #ccc;
+  padding: 7px;
+  background: #fff;
+  border-radius: 3px;
+}
+.pa-caption {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  gap: 8px;
+}
+.pa-scope {
+  margin: 2px 0 12px;
+}
+.pa-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 10px 12px;
+  background: #fafafa;
+  margin-bottom: 7px;
+}
+.pa-product,
+.pa-info {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.of-app .pa-product-name {
+  border: 0;
+  padding: 0;
+  font-weight: 600;
+  text-align: left;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.pa-product-name:hover {
+  text-decoration: underline;
+}
+.pa-product small {
+  margin-top: 4px;
+}
+.pa-info > strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.pa-tag {
+  display: inline-block;
+  border: 1px solid #ccc;
+  padding: 1px 4px;
+  margin-left: 6px;
+  font-size: 11px;
+  background: #f3f3f3;
+}
+.of-app .pa-expand {
+  font-size: 12px;
+  padding: 3px 7px;
+  margin-right: 6px;
+}
+.pa-product small,
+.pa-info > small {
+  display: block;
+}
+.pa-vendor-price {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 9px;
+  align-items: baseline;
+  font-size: 12px;
+  margin: 3px 0;
+}
+.pa-vendor-price strong {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.of-app .pa-open {
+  padding: 3px 7px;
+  font-size: 12px;
+  margin-top: 5px;
+}
+.pa-empty {
+  border: 1px solid #ddd;
+  padding: 18px 12px;
+  font-size: 13px;
+}
+.pa-more {
+  width: 100%;
+}
+.pa-footer {
+  color: #666;
+  font-size: 11px;
+  border-top: 1px solid #ccc;
+  padding-top: 9px;
+  margin-top: 16px;
+}
+@media (max-width: 640px) {
+  .pa-main {
+    padding: 12px;
+  }
+  .pa-modes {
+    gap: 5px;
+  }
+  .pa-modes button {
+    font-size: 12px;
+    padding: 6px 8px;
+    gap: 6px;
+  }
+  .pa-filters {
+    flex-wrap: wrap;
+  }
+  .pa-filters .of-search {
+    flex-basis: 100%;
+    position: static;
+  }
+  .pa-filters > label {
+    width: 100%;
+  }
+  .pa-filters select {
+    flex: 1;
+    max-width: none;
+    min-width: 0;
+  }
+  .pa-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    padding: 9px 10px;
+  }
+  .pa-product-name {
+    font-size: 13px !important;
+  }
+  .pa-caption small {
+    font-size: 10px;
+  }
+}

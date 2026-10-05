@@ -41,8 +41,8 @@ export function TopNavigation({
   active,
   onNavigate,
 }: {
-  active: "order" | "operations";
-  onNavigate: (v: "order" | "operations") => void;
+  active: "order" | "operations" | "analysis";
+  onNavigate: (v: "order" | "operations" | "analysis") => void;
 }) {
   return (
     <nav className="order-top-tabs" aria-label="최상위 화면">
@@ -58,6 +58,7 @@ export function TopNavigation({
       >
         주문·업무 찾기
       </button>
+      <button className={active === "analysis" ? "active" : ""} onClick={() => onNavigate("analysis")}>매입 분석</button>
     </nav>
   );
 }
@@ -86,9 +87,8 @@ type Dialog = {
   from?: "manage" | "suppliers";
 };
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-export default function OrderApp() {
-  const data = useOrderData(),
-    { snapshot, preferences: prefs } = data;
+export default function OrderApp({ data, focusProduct }: { data: ReturnType<typeof useOrderData>; focusProduct?: { product: Product; token: number } }) {
+  const { snapshot, preferences: prefs } = data;
   const [query, setQuery] = useState(""),
     deferred = useDeferredValue(query);
   const [scope, setScope] = useState<{ name: string; names: string[] } | null>(
@@ -324,6 +324,15 @@ export default function OrderApp() {
     setOpen(new Set());
     setClosed(new Set());
   }
+  useEffect(() => {
+    if (!focusProduct) return;
+    const p = focusProduct.product;
+    search(p.code ?? p.name);
+    setScope(null);
+    setDialog(null);
+    setPending("");
+    setOpen(new Set([p.baseId]));
+  }, [focusProduct]);
   function selectScope(name: string, names: string[]) {
     setScope({ name, names });
     setQuery("");
