@@ -9,7 +9,7 @@ export function isOpen(item: DashboardItem): boolean {
 export function isDueSoon(item: DashboardItem, now = new Date()): boolean {
   if (!item.dueAt) return false;
   const days = Math.ceil((item.dueAt.getTime() - now.getTime()) / 86400000);
-  return days >= 0 && days <= 14;
+  return days >= 0 && days <= 180;
 }
 
 export function isOverdue(item: DashboardItem, now = new Date()): boolean {
