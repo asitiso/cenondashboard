@@ -100,7 +100,10 @@
   background: #fee9e7;
 }
 .pa-rises .pa-change-badge {
-  font-size: 14px;
+  font-size: 12px;
+}
+.pa-rises .pa-change-rate {
+  font-size: 13px;
 }
 .pa-fall {
   color: #1753a0;
@@ -238,7 +241,10 @@
     font-size: 14px;
   }
   .pa-rises .pa-change-badge {
-    font-size: 12px;
+    font-size: 10px;
+  }
+  .pa-rises .pa-change-rate {
+    font-size: 11px;
   }
   .pa-vendor-price {
     gap: 3px 6px;

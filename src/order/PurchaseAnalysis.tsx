@@ -215,7 +215,7 @@ export default function PurchaseAnalysis({
                     {mode === "rises" && item.increase && (
                       <>
                         <strong
-                          className={`pa-change-badge ${item.increase.difference > 0 ? "pa-rise" : item.increase.difference < 0 ? "pa-fall" : "pa-same"}`}
+                          className={`pa-change-badge pa-change-rate ${item.increase.difference > 0 ? "pa-rise" : item.increase.difference < 0 ? "pa-fall" : "pa-same"}`}
                         >
                           {item.increase.difference === 0
                             ? "가격 동일"
