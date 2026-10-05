@@ -1066,12 +1066,12 @@ export default function OrderApp() {
         </Modal>
       )}
       {dialog?.kind === "suppliers" && (
-        <Modal title="매입처·주문 정보 관리" onClose={close} initialScrollTop={supplierScroll.current} onScrollTop={top => { supplierScroll.current = top; }}>
+        <Modal title="매입처·주문 정보 관리" onClose={close} initialScrollTop={supplierScroll.current}>
           {notice && <p role="status">{notice}</p>}
           <SupplierManager
             names={managedSuppliers} prefs={prefs} query={supplierQuery}
             onQuery={setSupplierQuery} busy={busy}
-            onEdit={(name) => edit({ kind: "supplier", supplier: name, from: "suppliers" })}
+            onEdit={(name, scrollTop) => { supplierScroll.current = scrollTop ?? 0; edit({ kind: "supplier", supplier: name, from: "suppliers" }); }}
             onRemove={(name) => {
               if (!window.confirm(`${name}의 주문 정보를 삭제할까요? 매입 이력과 즐겨찾기 사이트는 보존됩니다.`)) return;
               void run(async () => {

@@ -19,7 +19,7 @@ export function removeSupplierSettings(prefs: Preferences, name: string): Prefer
 
 export function SupplierManager({ names, prefs, query, onQuery, onEdit, onRemove, busy }: {
   names: string[]; prefs: Preferences; query: string; onQuery: (value: string) => void;
-  onEdit: (name: string) => void; onRemove: (name: string) => void; busy: boolean;
+  onEdit: (name: string, scrollTop?: number) => void; onRemove: (name: string) => void; busy: boolean;
 }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -36,7 +36,7 @@ export function SupplierManager({ names, prefs, query, onQuery, onEdit, onRemove
     </div>
     {adding && <div className="of-actions">
       <input aria-label="새 매입처 이름" placeholder="새 매입처 이름" value={name} onChange={(e) => setName(e.target.value)} />
-      <button disabled={!name.trim() || busy} onClick={() => onEdit(name.trim())}>주문 정보 등록</button>
+      <button disabled={!name.trim() || busy} onClick={e => onEdit(name.trim(), e.currentTarget.closest<HTMLElement>('[role="dialog"]')?.scrollTop)}>주문 정보 등록</button>
     </div>}
     <p className="of-muted">{rows.length.toLocaleString()}곳 · 매입 기록의 거래처명은 원본 그대로 유지합니다. 삭제는 주문 정보만 해제하며 매입 이력과 즐겨찾기 사이트는 보존합니다.</p>
     <div className="of-supplier-manager">
@@ -47,7 +47,7 @@ export function SupplierManager({ names, prefs, query, onQuery, onEdit, onRemove
         return <div className="of-supplier-manager-row" key={n}>
           <div><strong>{n}</strong><small>{site ? `${site.title} · ${site.url || "주소 미등록"}` : conf?.phone || "주문 정보 미등록"}</small></div>
           <div className="of-actions">
-            <button onClick={() => onEdit(n)}>{conf ? "수정" : "등록"}</button>
+            <button onClick={e => onEdit(n, e.currentTarget.closest<HTMLElement>('[role="dialog"]')?.scrollTop)}>{conf ? "수정" : "등록"}</button>
             <button disabled={!configured || busy} onClick={() => onRemove(n)}>삭제</button>
           </div>
         </div>;
