@@ -9,6 +9,7 @@ import {
 } from "./workspace";
 import { yearStart } from "./core";
 import { allOrderSites } from "./orderSites";
+import { isManualProduct } from "./productSettings";
 export type CardProps = {
   product: Product;
   preferences: Preferences;
@@ -23,6 +24,7 @@ export type CardProps = {
   onAddSupplier: (p: Product) => void;
   onChooseSite: (p: Product, name: string) => void;
   onSearchName: (p: Product) => void;
+  onEditProduct: (p: Product) => void;
   onUnit: (p: Product) => void;
   onBarcode: (p: Product) => void;
   onClassify: (p: Product) => void;
@@ -41,6 +43,7 @@ export function SearchCard({
   onAddSupplier,
   onChooseSite,
   onSearchName,
+  onEditProduct,
   onUnit,
   onBarcode,
   onClassify,
@@ -56,6 +59,9 @@ export function SearchCard({
     drop = priceDecrease(p, setting);
   const supplierSetting = (name: string) =>
     prefs.productSuppliers?.[p.baseId + "|" + name] ?? prefs.suppliers[name];
+  const referenceSupplier = [...(prefs.additionalSuppliers?.[p.baseId] ?? []), ...(p.manualSupplier ? [p.manualSupplier] : [])]
+    .find(name => (!scope.length || scope.includes(name)) && !!prefs.referencePrices?.[p.baseId + "|" + name]);
+  const reference = referenceSupplier ? prefs.referencePrices?.[p.baseId + "|" + referenceSupplier] : undefined;
   const site = (name: string) =>
     allOrderSites(prefs).find(
       (b) => !b.deletedAt && b.id === supplierSetting(name)?.bookmarkId,
@@ -112,6 +118,8 @@ export function SearchCard({
                 매입 {selected.date} · {selected.supplier}
               </small>
             </>
+          ) : reference ? (
+            <><div>{reference.amount.toLocaleString("ko-KR", { maximumFractionDigits: 2 })}원 / {reference.unit}</div><small>등록 가격 · {referenceSupplier}</small></>
           ) : (
             <small>매입 이력 없음</small>
           )}
@@ -145,6 +153,7 @@ export function SearchCard({
                 <button onClick={() => onClassify(p)}>상품 연결</button>
               )}
               <button onClick={() => onSearchName(p)}>검색명 수정</button>
+              {isManualProduct(p) && <button onClick={() => onEditProduct(p)}>상품 수정·삭제</button>}
             </div>
           </div>
           {rise && (
@@ -236,6 +245,7 @@ export function SearchCard({
                       {scope.includes(r.supplier) && <span>검색 거래처</span>}
                       {old && <span>1년 이상 지난 가격</span>}
                     </div>
+                    {prefs.supplierNotes?.[p.baseId + "|" + r.supplier] && <small className="of-muted">{prefs.supplierNotes[p.baseId + "|" + r.supplier]}</small>}
                   </div>
                   <div className="of-price">
                     {price(r)}
@@ -298,15 +308,18 @@ export function SearchCard({
           {[...new Set([...(prefs.additionalSuppliers?.[p.baseId] ?? []), ...(p.manualSupplier ? [p.manualSupplier] : [])])].filter(name => !rows.some(r => r.supplier === name)).map(name => (
             <div className="of-vendor-wrap" key={name}>
               <div className="of-vendor">
-                <div><button className="of-vendor-name" onClick={() => onSupplier(p, name)}>{name}</button><small className="of-muted">등록한 매입처 · 매입 기록 없음</small></div>
-                <div className="of-price"><small>가격·날짜 미등록</small></div>
+                <div><button className="of-vendor-name" onClick={() => onSupplier(p, name)}>{name}</button><small className="of-muted">등록한 매입처 · 매입 기록 없음</small>{prefs.supplierNotes?.[p.baseId + "|" + name] && <small className="of-muted">{prefs.supplierNotes[p.baseId + "|" + name]}</small>}</div>
+                <div className="of-price">
+                  {prefs.referencePrices?.[p.baseId + "|" + name] ? <><span>{prefs.referencePrices[p.baseId + "|" + name].amount.toLocaleString("ko-KR", { maximumFractionDigits: 2 })}원 / {prefs.referencePrices[p.baseId + "|" + name].unit}</span><small>등록 가격</small></> : <small>가격 미등록</small>}
+                  <button onClick={() => onSupplier(p, name)}>가격·비고 수정</button>
+                </div>
                 <div className="of-vendor-order"><button className="of-primary of-order" onClick={() => hasOrder(name) ? onOrder(p, name) : onSupplier(p, name)}>{hasOrder(name) ? "바로주문 ↗" : "주소 등록"}</button>
                 {(supplierSetting(name)?.bookmarkIds?.length ?? 0) > 1 && <button onClick={() => onChooseSite(p, name)}>주문처 선택</button>}
                 </div>
               </div>
             </div>
           ))}
-          {!rows.length && !prefs.additionalSuppliers?.[p.baseId]?.length && (
+          {!rows.length && !prefs.additionalSuppliers?.[p.baseId]?.length && !p.manualSupplier && (
             <div className="of-empty">
               매입 이력이 없습니다.
               {p.manualSupplier && (

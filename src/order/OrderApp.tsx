@@ -9,6 +9,7 @@ import { SupplierManager, removeSupplierSettings } from "./SupplierManager";
 import { AddSupplier } from "./AddSupplier";
 import { registerProductSupplier, connectWholesaleSites, isWholesaleSite, confirmRestore } from "./additionalSuppliers";
 import { allOrderSites, connectionSites, copiedSupplierSite, saveOrderSite } from "./orderSites";
+import { editManualProduct, isManualProduct, isProductSite, saveProductSupplierInfo } from "./productSettings";
 import { formatPhone } from "./phone";
 import { SiteButton } from "./SiteButton";
 import { toggleSitePin } from "./quickPin";
@@ -66,6 +67,7 @@ type Dialog = {
     | "favorites"
     | "purchase"
     | "camera"
+    | "productEdit"
     | "short"
     | "unit"
     | "barcode"
@@ -113,6 +115,9 @@ export default function OrderApp() {
     [packUnit, setPackUnit] = useState("포장"),
     [count, setCount] = useState("1"),
     [address, setAddress] = useState(""),
+    [registeredPrice, setRegisteredPrice] = useState(""),
+    [registeredUnit, setRegisteredUnit] = useState("개"),
+    [productNote, setProductNote] = useState(""),
     [phone, setPhone] = useState(""),
     [method, setMethod] = useState("사이트"),
     [extra, setExtra] = useState(""),
@@ -123,19 +128,24 @@ export default function OrderApp() {
     [busy, setBusy] = useState(false);
   const [newUsage, setNewUsage] = useState<Usage>("retail");
   const [supplierQuery, setSupplierQuery] = useState("");
+  const [deleteProductConfirm, setDeleteProductConfirm] = useState(false);
   const supplierScroll = useRef(0);
   const active = prefs.bookmarks.filter((b) => !b.deletedAt),
     orderSites = allOrderSites(prefs),
     products = useMemo(() => {
       const grouped = new Map<string, Product[]>();
-      for (const p of snapshot?.products ?? [])
+      for (const original of snapshot?.products ?? []) {
+        const change = prefs.manualProductEdits?.[original.baseId];
+        if (change?.deleted && isManualProduct(original)) continue;
+        const p = change?.name && isManualProduct(original) ? { ...original, name: change.name } : original;
         grouped.set(p.baseId, [...(grouped.get(p.baseId) ?? []), p]);
+      }
       return [...grouped.values()]
         .map((list) =>
           usage === "all" ? list[0] : list.find((p) => p.usage === usage),
         )
         .filter((p): p is Product => !!p);
-    }, [snapshot, usage]);
+    }, [snapshot, usage, prefs.manualProductEdits]);
   const suppliers = useMemo(
     () =>
       [
@@ -252,6 +262,7 @@ export default function OrderApp() {
   function edit(d: Dialog) {
     setNotice("");
     setField(d.p ? shortName(d.p, prefs) : query);
+    if (d.kind === "productEdit" && d.p) { setField(d.p.name); setDeleteProductConfirm(false); }
     if (d.kind === "unit" && d.p) {
       const unit = prefs.units[d.p.baseId];
       setCount(String(unit?.count ?? 1));
@@ -276,8 +287,12 @@ export default function OrderApp() {
       );
       setExtra(conf?.methods?.[1] ?? link?.methods?.[1] ?? "");
       setMemo(conf?.memo ?? link?.memo ?? "");
+      const reference = prefs.referencePrices?.[d.p?.baseId + "|" + d.supplier];
+      setRegisteredPrice(reference ? String(reference.amount) : "");
+      setRegisteredUnit(reference?.unit ?? prefs.units[d.p?.baseId ?? ""]?.baseUnit ?? "개");
+      setProductNote(prefs.supplierNotes?.[d.p?.baseId + "|" + d.supplier] ?? "");
       setOnlyProduct(
-        !!prefs.productSuppliers?.[d.p?.baseId + "|" + d.supplier],
+        (!!d.p && isProductSite(d.supplier + " " + (link?.title ?? "") + " " + (link?.url ?? ""))) || !!prefs.productSuppliers?.[d.p?.baseId + "|" + d.supplier],
       );
     }
     if (d.kind === "barcode") setField(pending);
@@ -428,6 +443,7 @@ export default function OrderApp() {
     if (!dialog?.supplier) return;
     const name = dialog.supplier,
       product = dialog.p;
+    const productOnly = !!product && (onlyProduct || isProductSite(name + " " + address + " " + (connectionSites(prefs).find(b => b.id === chosenSite)?.title ?? "")));
     const url = address.trim() ? safeUrl(address) : "";
     if (address.trim() && !url) {
       setNotice("http 또는 https 주소를 입력하세요.");
@@ -447,7 +463,7 @@ export default function OrderApp() {
             phone: formatPhone(phone),
           };
           const productSuppliers = { ...p.productSuppliers };
-          if (!onlyProduct && product)
+          if (!productOnly && product)
             delete productSuppliers[product.baseId + "|" + name];
           const existing = connectionSites(p).find((b) => b.id === conf.bookmarkId);
           const site: Bookmark = {
@@ -465,13 +481,13 @@ export default function OrderApp() {
             ],
           };
           if (!isWholesaleSite(site.title)) {
-            const copied = copiedSupplierSite(site, name, onlyProduct ? product?.baseId : undefined);
+            const copied = copiedSupplierSite(site, name, productOnly ? product?.baseId : undefined);
             Object.assign(site, copied);
             conf.bookmarkId = site.id;
           }
           const next = {
             ...saveOrderSite(p, site),
-            ...(onlyProduct && product
+            ...(productOnly && product
               ? {
                   productSuppliers: {
                     ...p.productSuppliers,
@@ -483,7 +499,8 @@ export default function OrderApp() {
                   suppliers: { ...p.suppliers, [name]: conf },
                 }),
           };
-          return isWholesaleSite(site.title) ? connectWholesaleSites(next, name, onlyProduct ? product?.baseId : undefined) : next;
+          const withInfo = product ? saveProductSupplierInfo(next, product, name, registeredPrice, registeredUnit, productNote) : next;
+          return isWholesaleSite(site.title) ? connectWholesaleSites(withInfo, name, productOnly ? product?.baseId : undefined) : withInfo;
         }),
       )
     )
@@ -507,6 +524,7 @@ export default function OrderApp() {
       latest: [],
       frequency: [],
       manualSupplier: memo.trim(),
+      manual: true,
     };
     const empty: Snapshot = {
       version: "",
@@ -527,8 +545,8 @@ export default function OrderApp() {
     };
     const previous = snapshot ?? empty;
     if (
-      await run(() =>
-        data.saveSnapshot({
+      await run(async () => {
+        await data.saveSnapshot({
           ...previous,
           previousVersion: previous.version || undefined,
           version: crypto.randomUUID(),
@@ -536,8 +554,11 @@ export default function OrderApp() {
             ...previous.products.filter((x) => x.baseId !== baseId),
             p,
           ],
-        }),
-      )
+        });
+        if (prefs.manualProductEdits?.[baseId]) {
+          await data.change(value => editManualProduct(value, p, name));
+        }
+      })
     ) {
       setDialog(null);
       search(name);
@@ -888,6 +909,7 @@ export default function OrderApp() {
                   }
                   onAddSupplier={(p) => edit({ kind: "addSupplier", p })}
                   onChooseSite={(p, supplier) => edit({ kind: "mallSites", p, supplier })}
+                  onEditProduct={(p) => edit({ kind: "productEdit", p })}
                   onSearchName={(p) => edit({ kind: "short", p })}
                   onUnit={(p) => edit({ kind: "unit", p })}
                   onBarcode={(p) => edit({ kind: "barcode", p })}
@@ -1085,6 +1107,7 @@ export default function OrderApp() {
       )}
       {dialog &&
         [
+          "productEdit",
           "short",
           "unit",
           "barcode",
@@ -1099,6 +1122,7 @@ export default function OrderApp() {
           <Modal
             title={
               {
+                productEdit: "직접 등록한 상품 수정·삭제",
                 short: "주문 사이트 검색명",
                 unit: "매입 단위 확인",
                 barcode: "바코드 연결 관리",
@@ -1114,6 +1138,30 @@ export default function OrderApp() {
             onClose={close}
           >
             {notice && <p role="status">{notice}</p>}
+            {dialog.kind === "productEdit" && dialog.p && (
+              <>
+                <label>상품 이름<input value={field} onChange={e => setField(e.target.value)} /></label>
+                <div className="of-actions">
+                  <button disabled={busy} onClick={() => void run(async () => {
+                    await data.change(p => editManualProduct(p, dialog.p!, field));
+                    close();
+                    search(field.trim());
+                  })}>저장</button>
+                  <button disabled={busy} onClick={() => setDeleteProductConfirm(true)}>상품 삭제</button>
+                </div>
+                {deleteProductConfirm && <div role="alert">
+                  <p>직접 등록한 상품 ‘{dialog.p.name}’을 삭제할까요? 매입처와 즐겨찾기는 유지됩니다.</p>
+                  <div className="of-actions">
+                    <button disabled={busy} onClick={() => void run(async () => {
+                      await data.change(p => editManualProduct(p, dialog.p!, dialog.p!.name, true));
+                      close();
+                      setNotice("직접 등록한 상품을 삭제했습니다.");
+                    })}>삭제 확인</button>
+                    <button onClick={() => setDeleteProductConfirm(false)}>취소</button>
+                  </div>
+                </div>}
+              </>
+            )}
             {dialog.kind === "addSupplier" && dialog.p && <AddSupplier names={managedSuppliers} existing={[...supplierRows(dialog.p).map(r => r.supplier), ...(prefs.additionalSuppliers?.[dialog.p.baseId] ?? [])]} busy={busy} onAdd={(name) => void run(async () => {
               await data.change(p => {
                 return registerProductSupplier(p, dialog.p!.baseId, name);
@@ -1325,6 +1373,7 @@ export default function OrderApp() {
                       const site = connectionSites(prefs).find((b) => b.id === e.target.value);
                       setAddress(site?.url ?? "");
                       setPhone(site?.phone ?? "");
+                      if (dialog.p && isProductSite(dialog.supplier + " " + (site?.title ?? "") + " " + (site?.url ?? ""))) setOnlyProduct(true);
                     }}
                   >
                     <option value="">새 주문처 등록</option>
@@ -1348,6 +1397,14 @@ export default function OrderApp() {
                     onChange={(e) => setAddress(e.target.value)}
                   />
                 </label>
+                {dialog.p && !supplierRows(dialog.p).some(r => r.supplier === dialog.supplier) && (
+                  <>
+                    <p className="of-muted">직접 등록한 가격이며 실제 매입 이력에는 추가하지 않습니다.</p>
+                    <label>등록 가격 (원)<input aria-label="등록 가격" inputMode="decimal" value={registeredPrice} onChange={e => setRegisteredPrice(e.target.value)} placeholder="가격 입력 · 비우면 해제" /></label>
+                    <label>가격 단위<input aria-label="가격 단위" value={registeredUnit} onChange={e => setRegisteredUnit(e.target.value)} placeholder="개·롤·박스 등" /></label>
+                  </>
+                )}
+                {dialog.p && <label>이 상품의 매입처 비고<textarea value={productNote} onChange={e => setProductNote(e.target.value)} placeholder="배송비, 주문 조건 등" /></label>}
                 <label>
                   기본 주문 방법
                   <select
@@ -1391,10 +1448,11 @@ export default function OrderApp() {
                   <label className="of-check">
                     <input
                       type="checkbox"
-                      checked={onlyProduct}
+                      checked={onlyProduct || isProductSite(dialog.supplier + " " + address + " " + (connectionSites(prefs).find(b => b.id === chosenSite)?.title ?? ""))}
+                      disabled={isProductSite(dialog.supplier + " " + address + " " + (connectionSites(prefs).find(b => b.id === chosenSite)?.title ?? ""))}
                       onChange={(e) => setOnlyProduct(e.target.checked)}
                     />
-                    이 상품에만 적용하는 주문 방법
+                    이 상품에만 적용하는 주소·주문 방법 (네이버쇼핑은 상품별 저장)
                   </label>
                 )}
                 <button disabled={busy} onClick={() => void saveSupplier()}>

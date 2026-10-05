@@ -1859,3 +1859,4 @@
 .of-sidebar details .of-site-button .of-site-pin { flex-basis: 32px; width: 32px; }
 .of-directory .of-site-pin { border-left: 1px solid #ddd; }
 @media (pointer: coarse) { .of-site-button .of-site-pin { flex-basis: 36px; width: 36px; } }
+.of-app .order-modal textarea { width: 100%; min-height: 56px; resize: vertical; padding: 7px; border: 1px solid #bbb; border-radius: 3px; font: inherit; }

@@ -25,6 +25,7 @@ export interface CatalogItem {
   usage: Exclude<Usage, "unclassified">;
 }
 export interface Product {
+  manual?: boolean;
   id: string;
   baseId: string;
   name: string;
@@ -98,6 +99,9 @@ export interface SupplierSetting {
   memo: string;
 }
 export interface Preferences {
+  manualProductEdits?: Record<string, { name?: string; deleted?: boolean }>;
+  referencePrices?: Record<string, { amount: number; unit: string; updatedAt: string }>;
+  supplierNotes?: Record<string, string>;
   orderSites?: Bookmark[];
   additionalSuppliers?: Record<string, string[]>;
   barcodes?: Record<string, string[]>;
