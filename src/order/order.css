@@ -1458,6 +1458,26 @@
   font-weight: 400;
   margin-top: 3px;
 }
+.of-recommended-price,
+.of-price-recommended > span:first-child {
+  color: #1565c0;
+  font-weight: 700;
+}
+.of-recommend-badge {
+  display: inline-flex !important;
+  align-items: center;
+  width: auto;
+  margin-left: 4px;
+  padding: 0 4px;
+  border: 1px solid #90b7e8;
+  border-radius: 999px;
+  background: #eef5ff;
+  color: #1565c0 !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  line-height: 16px;
+  vertical-align: 1px;
+}
 .of-order {
   font-size: 11px !important;
   max-width: 70px;
