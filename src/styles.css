@@ -1632,9 +1632,40 @@ h2 {
   }
 
   .summary-grid,
-  .filter-bar,
-  .metric-strip {
+  .filter-bar {
     grid-template-columns: 1fr;
+  }
+
+  .metric-strip {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .compact-metric {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    min-width: 0;
+    min-height: 48px;
+    padding: 4px 2px;
+    text-align: center;
+  }
+
+  .compact-metric span {
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 10px;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .compact-metric strong {
+    font-size: 16px;
+    line-height: 1.1;
   }
 
   .detail-overlay {
