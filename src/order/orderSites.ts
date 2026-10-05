@@ -5,12 +5,20 @@ export function allOrderSites(p: Preferences): Bookmark[] {
   return (p.orderSites ?? []).filter(b => !b.deletedAt);
 }
 export function connectionSites(p: Preferences): Bookmark[] {
-  const sites = new Map(p.bookmarks.filter(b => !b.deletedAt).map(b => [b.id, b]));
+  const sites = new Map<string, Bookmark>();
   for (const site of allOrderSites(p)) {
-    const favorite = sites.get(site.id);
-    sites.set(site.id, { ...site, rank: favorite?.rank });
+    sites.set(site.id, site);
   }
+  for (const favorite of p.bookmarks.filter(b => !b.deletedAt)) sites.set(favorite.id, favorite);
   return [...sites.values()];
+}
+export function copiedSupplierSite(source: Bookmark, name: string, productId?: string): Bookmark {
+  return {
+    ...source,
+    id: stableId(productId ? "product-supplier-site|" + productId + "|" + name : "supplier-site|" + name),
+    folderId: "",
+    supplierNames: [name],
+  };
 }
 export function saveOrderSite(p: Preferences, site: Bookmark): Preferences {
   const { rank: _rank, favoriteExplicit: _explicit, deletedAt: _deleted, ...registered } = site;

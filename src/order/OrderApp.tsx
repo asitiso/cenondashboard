@@ -8,7 +8,8 @@ import { BarcodeCamera } from "./BarcodeCamera";
 import { SupplierManager, removeSupplierSettings } from "./SupplierManager";
 import { AddSupplier } from "./AddSupplier";
 import { registerProductSupplier, connectWholesaleSites, isWholesaleSite, confirmRestore } from "./additionalSuppliers";
-import { allOrderSites, connectionSites, saveOrderSite } from "./orderSites";
+import { allOrderSites, connectionSites, copiedSupplierSite, saveOrderSite } from "./orderSites";
+import { formatPhone } from "./phone";
 import { SiteButton } from "./SiteButton";
 import { toggleSitePin } from "./quickPin";
 import {
@@ -443,13 +444,8 @@ export default function OrderApp() {
                 : (method as SupplierSetting["method"]),
             methods: [method, ...(extra ? [extra] : [])],
             memo,
-            phone,
+            phone: formatPhone(phone),
           };
-          const previous = p.suppliers[name]?.bookmarkId;
-          if (!onlyProduct && previous && previous !== conf.bookmarkId && dialog.from !== "suppliers" && !isWholesaleSite(allOrderSites(p).find(b => b.id === conf.bookmarkId)?.title ?? ""))
-            throw Error(
-              "기존 연결을 유지하세요. 상품별 예외 주문처는 ‘이 상품만 적용’을 선택하여 지정할 수 있습니다.",
-            );
           const productSuppliers = { ...p.productSuppliers };
           if (!onlyProduct && product)
             delete productSuppliers[product.baseId + "|" + name];
@@ -462,12 +458,17 @@ export default function OrderApp() {
             folderId: existing?.folderId ?? "",
             category: existing?.category ?? "종합도매",
             memo,
-            phone,
+            phone: formatPhone(phone),
             methods: conf.methods,
             supplierNames: [
               ...new Set([...(existing?.supplierNames ?? []), name]),
             ],
           };
+          if (!isWholesaleSite(site.title)) {
+            const copied = copiedSupplierSite(site, name, onlyProduct ? product?.baseId : undefined);
+            Object.assign(site, copied);
+            conf.bookmarkId = site.id;
+          }
           const next = {
             ...saveOrderSite(p, site),
             ...(onlyProduct && product
@@ -1307,12 +1308,9 @@ export default function OrderApp() {
             {dialog.kind === "supplier" && (
               <>
                 <h3>{dialog.supplier}</h3>
-                <p className="of-muted">매입처 주소 저장은 즐겨찾기를 추가하지 않습니다.</p>
-                {chosenSite && namesForSite(orderSites.find((b) => b.id === chosenSite)).length > 1 && (
-                  <p className="of-muted">공통 주소를 수정하면 함께 연결된 거래처에도 반영됩니다: {namesForSite(orderSites.find((b) => b.id === chosenSite)).join(", ")}</p>
-                )}
+                <p className="of-muted">즐겨찾기에서 주소를 복사해 저장할 수 있습니다. 같은 주소를 여러 매입처에 사용할 수 있으며, 즐겨찾기는 변경되지 않습니다.</p>
                 <label>
-                  연결 사이트
+                  주소를 가져올 사이트
                   <input
                     aria-label="연결 사이트 검색"
                     placeholder="사이트 이름 일부로 검색"
@@ -1344,7 +1342,7 @@ export default function OrderApp() {
                   </select>
                 </label>
                 <label>
-                  공통 사이트 주소 · 비워도 등록
+                  매입처 사이트 주소 · 비워도 등록
                   <input
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
@@ -1376,7 +1374,9 @@ export default function OrderApp() {
                 <label>
                   전화번호
                   <input
+                    type="tel"
                     value={phone}
+                    onBlur={e => setPhone(formatPhone(e.target.value))}
                     onChange={(e) => setPhone(e.target.value)}
                   />
                 </label>

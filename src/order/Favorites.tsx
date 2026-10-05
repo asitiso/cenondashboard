@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import type { Bookmark, BookmarkFolder, Preferences } from "./types";
 import { Modal, BookmarkImport } from "./ImportPanels";
 import { normalizeName, pinBookmark, safeUrl } from "./core";
+import { formatPhone } from "./phone";
 import { SiteButton } from "./SiteButton";
 import {
   deleteFolder,
@@ -617,6 +618,7 @@ export function Favorites({
                     folderId,
                     category: site.category ?? "기타",
                     memo: site.memo ?? "",
+                    phone: formatPhone(site.phone ?? ""),
                   };
                   if (
                     p.bookmarks.some(
@@ -627,32 +629,9 @@ export function Favorites({
                     )
                   )
                     throw Error("구분할 다른 이름을 입력하세요.");
-                  const settings = { ...p.suppliers };
-                  for (const name of suppliers) {
-                    if (value.supplierNames?.includes(name)) {
-                      const existing = settings[name];
-                      if (
-                        existing?.bookmarkId &&
-                        existing.bookmarkId !== value.id
-                      )
-                        throw Error(
-                          "다른 사이트에 연결된 거래처는 기존 사이트에서 수정하세요.",
-                        );
-                      settings[name] = {
-                        ...existing,
-                        bookmarkId: value.id,
-                        method: (value.methods?.[0] ?? "사이트") as "사이트",
-                        memo: value.memo,
-                      };
-                    } else if (settings[name]?.bookmarkId === value.id) {
-                      const { bookmarkId: _, ...rest } = settings[name];
-                      settings[name] = rest;
-                    }
-                  }
                   return {
                     ...p,
                     folders,
-                    suppliers: settings,
                     bookmarks: p.bookmarks.some((b) => b.id === value.id)
                       ? p.bookmarks.map((b) => (b.id === value.id ? value : b))
                       : [...p.bookmarks, value],
@@ -731,7 +710,9 @@ export function Favorites({
           <label>
             전화번호
             <input
+              type="tel"
               value={site.phone ?? ""}
+              onBlur={e => setSite({ ...site, phone: formatPhone(e.target.value) })}
               onChange={(e) => setSite({ ...site, phone: e.target.value })}
             />
           </label>
@@ -742,44 +723,7 @@ export function Favorites({
               onChange={(e) => setSite({ ...site, memo: e.target.value })}
             />
           </label>
-          <details>
-            <summary>연결할 매입 거래처</summary>
-            {suppliers.map((name) => (
-              <label className="of-check" key={name}>
-                <input
-                  type="checkbox"
-                  checked={
-                    site.supplierNames?.includes(name) ??
-                    (!!site.id && p.suppliers[name]?.bookmarkId === site.id)
-                  }
-                  disabled={
-                    !!p.suppliers[name]?.bookmarkId &&
-                    p.suppliers[name].bookmarkId !== site.id
-                  }
-                  onChange={(e) =>
-                    setSite({
-                      ...site,
-                      supplierNames: e.target.checked
-                        ? [
-                            ...(site.supplierNames ??
-                              suppliers.filter(
-                                (n) => p.suppliers[n]?.bookmarkId === site.id,
-                              )),
-                            name,
-                          ]
-                        : (
-                            site.supplierNames ??
-                            suppliers.filter(
-                              (n) => p.suppliers[n]?.bookmarkId === site.id,
-                            )
-                          ).filter((n) => n !== name),
-                    })
-                  }
-                />
-                {name}
-              </label>
-            ))}
-          </details>
+
           <button disabled={busy}>저장</button>
           <button type="button" onClick={back}>
             취소

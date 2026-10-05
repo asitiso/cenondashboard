@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { allOrderSites, saveOrderSite, separateAutomaticSites } from "./orderSites";
+import { allOrderSites, connectionSites, copiedSupplierSite, saveOrderSite, separateAutomaticSites } from "./orderSites";
 import { emptyPreferences } from "./storage";
 import { stableId } from "./core";
 
@@ -35,4 +35,24 @@ it("keeps supplier links and addresses after a favorite is edited, trashed, or r
   const edited = saveOrderSite(migrated, { ...site, url: "https://supplier.example.com" });
   expect(edited.bookmarks).toEqual([site]);
   expect(allOrderSites(edited)[0].url).toBe("https://supplier.example.com");
+});
+
+it("copies one favorite into multiple independent supplier addresses", () => {
+  const source = { id: "favorite", title: "공용 사이트", url: "https://original.example.com", folderId: "f", category: "기타", memo: "" };
+  let next: ReturnType<typeof saveOrderSite> = { ...emptyPreferences, bookmarks: [source] };
+  const first = copiedSupplierSite(source, "매입처 A");
+  const second = copiedSupplierSite(source, "매입처 B");
+  next = saveOrderSite(saveOrderSite(next, first), second);
+  expect(first.id).not.toBe(second.id);
+  expect(first.id).not.toBe(source.id);
+  next = saveOrderSite(next, { ...first, url: "https://changed.example.com" });
+  expect(allOrderSites(next).find(b => b.id === second.id)?.url).toBe(source.url);
+  expect(next.bookmarks).toEqual([source]);
+  expect(copiedSupplierSite(source, "매입처 A", "product").id).not.toBe(first.id);
+});
+it("offers the latest favorite address as a copy source instead of its legacy supplier copy", () => {
+  const source = { id: "favorite", title: "사이트", url: "https://new.example.com", folderId: "f", category: "기타", memo: "" };
+  const prefs = { ...emptyPreferences, bookmarks: [source], orderSites: [{ ...source, url: "https://old.example.com" }] };
+  expect(connectionSites(prefs).find(b => b.id === source.id)?.url).toBe(source.url);
+  expect(allOrderSites(prefs)[0].url).toBe("https://old.example.com");
 });
