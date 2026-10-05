@@ -9,6 +9,8 @@ import { SupplierManager, removeSupplierSettings } from "./SupplierManager";
 import { AddSupplier } from "./AddSupplier";
 import { registerProductSupplier, connectWholesaleSites, isWholesaleSite, confirmRestore } from "./additionalSuppliers";
 import { allOrderSites, saveOrderSite } from "./orderSites";
+import { SiteButton } from "./SiteButton";
+import { toggleSitePin } from "./quickPin";
 import {
   barcodeLink,
   displayPrice,
@@ -323,6 +325,12 @@ export default function OrderApp() {
     window.open(url, "_blank", "noopener,noreferrer");
     void run(() => data.click(b.id));
   }
+  function pinSite(b: Bookmark) {
+    void run(async () => {
+      await data.change(p => toggleSitePin(p, b.id));
+      setNotice("고정 즐겨찾기를 변경했습니다.");
+    });
+  }
   function order(p: Product, name: string, selectedMode?: string, siteId?: string) {
     const conf =
         prefs.productSuppliers?.[p.baseId + "|" + name] ??
@@ -574,7 +582,7 @@ export default function OrderApp() {
           >
             즐겨찾기 편집
           </button>
-          <FolderTree preferences={prefs} onOpen={openSite} />
+          <FolderTree preferences={prefs} onOpen={openSite} onPin={pinSite} busy={busy} />
         </aside>
         <main className="of-main">
           <div className="of-heading">
@@ -667,14 +675,12 @@ export default function OrderApp() {
                 </div>
                 <div className="of-home-sites">
                   {hot.fixed.map((b) => (
-                    <button key={b.id} onClick={() => openSite(b)}>
-                      {b.title} ↗
-                    </button>
+                    <SiteButton key={b.id} site={b} onOpen={openSite} onPin={pinSite} busy={busy} />
                   ))}
                 </div>
                 {!hot.fixed.length && (
                   <p className="of-muted">
-                    즐겨찾기 편집에서 ☆를 눌러 고정할 수 있습니다.
+                    사이트 옆 ☆를 누르면 여기에 고정됩니다.
                   </p>
                 )}
                 {hot.frequent.length > 0 && (
@@ -682,9 +688,7 @@ export default function OrderApp() {
                     <h2>자주 쓰는 사이트</h2>
                     <div className="of-home-sites">
                       {hot.frequent.map((b) => (
-                        <button key={b.id} onClick={() => openSite(b)}>
-                          {b.title} ↗
-                        </button>
+                        <SiteButton key={b.id} site={b} onOpen={openSite} onPin={pinSite} busy={busy} />
                       ))}
                     </div>
                   </>
@@ -699,9 +703,7 @@ export default function OrderApp() {
                       <h3>{f.name}</h3>
                       <div>
                         {links.map((b) => (
-                          <button key={b.id} onClick={() => openSite(b)}>
-                            {b.title} ↗
-                          </button>
+                          <SiteButton key={b.id} site={b} onOpen={openSite} onPin={pinSite} busy={busy} />
                         ))}
                       </div>
                     </section>
@@ -917,7 +919,7 @@ export default function OrderApp() {
                   <h2>업무 사이트</h2>
                   {siteCandidates.map((b) => (
                     <div className="of-supplier-card" key={b.id}>
-                      <button onClick={() => openSite(b)}>{b.title} ↗</button>
+                      <SiteButton site={b} onOpen={openSite} onPin={pinSite} busy={busy} />
                       {namesForSite(b).length > 0 && (
                         <button
                           onClick={() => selectScope(b.title, namesForSite(b))}

@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import type { Bookmark, BookmarkFolder, Preferences } from "./types";
 import { Modal, BookmarkImport } from "./ImportPanels";
 import { normalizeName, pinBookmark, safeUrl } from "./core";
+import { SiteButton } from "./SiteButton";
 import {
   deleteFolder,
   descendants,
@@ -19,9 +20,13 @@ type Props = {
 export function FolderTree({
   preferences,
   onOpen,
+  onPin,
+  busy,
 }: {
   preferences: Preferences;
   onOpen: (b: Bookmark) => void;
+  onPin: (b: Bookmark) => void;
+  busy?: boolean;
 }) {
   function tree(parent: string | null) {
     return preferences.folders
@@ -43,9 +48,7 @@ export function FolderTree({
             .filter((b) => !b.deletedAt && b.folderId === f.id)
             .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
             .map((b) => (
-              <button key={b.id} onClick={() => onOpen(b)}>
-                {b.title} ↗
-              </button>
+              <SiteButton key={b.id} site={b} onOpen={onOpen} onPin={onPin} busy={busy} />
             ))}
           <div className="of-nested">{tree(f.id)}</div>
         </details>

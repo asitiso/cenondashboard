@@ -71,6 +71,7 @@ export interface BookmarkFolder {
   order: number;
 }
 export interface Bookmark {
+  favoriteExplicit?: boolean;
   id: string;
   title: string;
   url: string;

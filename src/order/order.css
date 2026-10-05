@@ -1851,3 +1851,11 @@
 .of-supplier-manager-row .of-actions { flex: none; }
 .of-vendor-order { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .of-vendor-order > button:not(.of-primary) { font-size: 11px; padding: 3px 2px; }
+.of-site-button { display: inline-flex; align-items: stretch; min-width: 0; max-width: 100%; }
+.of-site-button .of-site-open { flex: 1; min-width: 0; margin: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; overflow-wrap: anywhere; }
+.of-site-button .of-site-pin { flex: 0 0 32px; width: 32px; margin: 0; padding: 2px; border-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; text-align: center; font-size: 18px; }
+.of-sidebar details .of-site-button { display: flex; width: 100%; }
+.of-sidebar details .of-site-button button { width: auto; }
+.of-sidebar details .of-site-button .of-site-pin { flex-basis: 32px; width: 32px; }
+.of-directory .of-site-pin { border-left: 1px solid #ddd; }
+@media (pointer: coarse) { .of-site-button .of-site-pin { flex-basis: 36px; width: 36px; } }
