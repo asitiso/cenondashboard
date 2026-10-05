@@ -59,9 +59,11 @@ export function groupVendorPrices(values: VendorPrice[]): VendorPrice[] {
 export function buildPurchaseAnalysis(
   snapshot: Snapshot | undefined,
   prefs: Preferences,
+  usage: Product["usage"] | "all" = "all",
 ) {
   const grouped = new Map<string, Product[]>();
   for (const p of snapshot?.products ?? []) {
+    if (usage !== "all" && p.usage !== usage) continue;
     if (isManualProduct(p) && prefs.manualProductEdits?.[p.baseId]?.deleted)
       continue;
     grouped.set(p.baseId, [...(grouped.get(p.baseId) ?? []), p]);

@@ -48,6 +48,35 @@ const prefs = {
     },
   },
 };
+it("limits analysis to the selected sale or dispensing records", () => {
+  const dispensing = product([
+    receipt("2026-10-02", "A", 120),
+    receipt("2026-09-01", "A", 100),
+  ]);
+  const retail: Product = {
+    ...dispensing,
+    id: "retail",
+    usage: "retail",
+    latest: [receipt("2026-10-01", "B", 300), receipt("2026-09-01", "B", 200)],
+  };
+  const data = snapshot([dispensing, retail]);
+  expect(
+    buildPurchaseAnalysis(data, emptyPreferences, "retail").rises[0].increase
+      ?.current.amount,
+  ).toBe(300);
+  expect(
+    buildPurchaseAnalysis(data, emptyPreferences, "retail").rises[0].product
+      .usage,
+  ).toBe("retail");
+  expect(
+    buildPurchaseAnalysis(data, emptyPreferences, "dispensing").rises[0]
+      .increase?.current.amount,
+  ).toBe(120);
+  expect(
+    buildPurchaseAnalysis(snapshot([retail]), emptyPreferences, "dispensing")
+      .changes,
+  ).toEqual([]);
+});
 it("sorts price changes by date, percentage or absolute amount without changing the source", () => {
   const make = (
     baseId: string,

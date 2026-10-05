@@ -51,9 +51,10 @@ export default function PurchaseAnalysis({
   onInspect: (p: Product) => void;
 }) {
   const { snapshot, preferences, loading, error } = data;
+  const [usage, setUsage] = useState<"all" | "retail" | "dispensing">("all");
   const analysis = useMemo(
-    () => buildPurchaseAnalysis(snapshot, preferences),
-    [snapshot, preferences],
+    () => buildPurchaseAnalysis(snapshot, preferences, usage),
+    [snapshot, preferences, usage],
   );
   const [mode, setMode] = useState<Mode>("rises");
   const [query, setQuery] = useState("");
@@ -65,7 +66,7 @@ export default function PurchaseAnalysis({
   const [top, setTop] = useState(false);
   useEffect(() => {
     setLimit(50);
-  }, [mode, query, supplier, change, order]);
+  }, [mode, query, supplier, change, order, usage]);
   useEffect(() => {
     const scroll = () => setTop(window.scrollY > 300);
     window.addEventListener("scroll", scroll, { passive: true });
@@ -128,6 +129,25 @@ export default function PurchaseAnalysis({
                 >
                   {labels[value]}{" "}
                   <strong>{analysis[value].length.toLocaleString()}개</strong>
+                </button>
+              ))}
+            </nav>
+            <nav className="pa-sort pa-usage" aria-label="매입 분석 상품 용도">
+              {(["all", "retail", "dispensing"] as const).map((value) => (
+                <button
+                  key={value}
+                  aria-pressed={usage === value}
+                  className={usage === value ? "of-primary" : ""}
+                  onClick={() => {
+                    setUsage(value);
+                    setSupplier("");
+                  }}
+                >
+                  {value === "all"
+                    ? "전체"
+                    : value === "retail"
+                      ? "판매"
+                      : "조제"}
                 </button>
               ))}
             </nav>

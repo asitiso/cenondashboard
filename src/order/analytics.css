@@ -65,6 +65,9 @@
   flex-wrap: wrap;
   gap: 0;
 }
+.pa-usage {
+  margin: 0 0 10px;
+}
 .of-app .pa-sort button {
   padding: 5px 8px;
   font-size: 12px;
