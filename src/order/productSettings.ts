@@ -31,7 +31,7 @@ export function editManualProduct(prefs: Preferences, product: Product, name: st
   if (!name.trim()) throw Error("상품 이름을 입력하세요.");
   return { ...prefs, manualProductEdits: { ...prefs.manualProductEdits, [product.baseId]: { name: name.trim(), deleted } } };
 }
-export function saveProductSupplierInfo(prefs: Preferences, product: Product, supplier: string, price: string, unit: string, note: string): Preferences {
+export function saveRegisteredPrice(prefs: Preferences, product: Product, supplier: string, price: string, unit: string): Preferences {
   const key = product.baseId + "|" + supplier;
   const prices = { ...prefs.referencePrices };
   if (!supplierRows(product).some(row => row.supplier === supplier)) {
@@ -43,5 +43,11 @@ export function saveProductSupplierInfo(prefs: Preferences, product: Product, su
       prices[key] = { amount, unit: unit.trim(), updatedAt: new Date().toISOString() };
     }
   }
-  return { ...prefs, referencePrices: prices, supplierNotes: { ...prefs.supplierNotes, [key]: note.trim() } };
+  return { ...prefs, referencePrices: prices };
+}
+export function saveProductSupplierNote(prefs: Preferences, product: Product, supplier: string, note: string): Preferences {
+  return { ...prefs, supplierNotes: { ...prefs.supplierNotes, [product.baseId + "|" + supplier]: note.trim() } };
+}
+export function saveProductSupplierInfo(prefs: Preferences, product: Product, supplier: string, price: string, unit: string, note: string): Preferences {
+  return saveProductSupplierNote(saveRegisteredPrice(prefs, product, supplier, price, unit), product, supplier, note);
 }

@@ -9,7 +9,7 @@ import { SupplierManager, removeSupplierSettings } from "./SupplierManager";
 import { AddSupplier } from "./AddSupplier";
 import { registerProductSupplier, connectWholesaleSites, isWholesaleSite, confirmRestore } from "./additionalSuppliers";
 import { allOrderSites, connectionSites, copiedSupplierSite, saveOrderSite } from "./orderSites";
-import { editManualProduct, isManualProduct, isProductSite, saveProductSupplierInfo, renameRegisteredSupplier } from "./productSettings";
+import { editManualProduct, isManualProduct, isProductSite, saveRegisteredPrice, saveProductSupplierNote, renameRegisteredSupplier } from "./productSettings";
 import { formatPhone } from "./phone";
 import { SiteButton } from "./SiteButton";
 import { toggleSitePin } from "./quickPin";
@@ -68,6 +68,7 @@ type Dialog = {
     | "purchase"
     | "camera"
     | "productEdit"
+    | "price"
     | "short"
     | "unit"
     | "barcode"
@@ -268,6 +269,11 @@ export default function OrderApp() {
     setNotice("");
     setField(d.p ? shortName(d.p, prefs) : query);
     if (d.kind === "productEdit" && d.p) { setField(d.p.name); setDeleteProductConfirm(false); }
+    if (d.kind === "price" && d.p && d.supplier) {
+      const reference = prefs.referencePrices?.[d.p.baseId + "|" + d.supplier];
+      setRegisteredPrice(reference ? String(reference.amount) : "");
+      setRegisteredUnit(reference?.unit ?? prefs.units[d.p.baseId]?.baseUnit ?? "개");
+    }
     if (d.kind === "unit" && d.p) {
       const unit = prefs.units[d.p.baseId];
       setCount(String(unit?.count ?? 1));
@@ -292,9 +298,6 @@ export default function OrderApp() {
       );
       setExtra(conf?.methods?.[1] ?? link?.methods?.[1] ?? "");
       setMemo(conf?.memo ?? link?.memo ?? "");
-      const reference = prefs.referencePrices?.[d.p?.baseId + "|" + d.supplier];
-      setRegisteredPrice(reference ? String(reference.amount) : "");
-      setRegisteredUnit(reference?.unit ?? prefs.units[d.p?.baseId ?? ""]?.baseUnit ?? "개");
       setProductNote(prefs.supplierNotes?.[d.p?.baseId + "|" + d.supplier] ?? "");
       setRegisteredSupplierName(d.supplier ?? "");
       setOnlyProduct(
@@ -505,7 +508,7 @@ export default function OrderApp() {
                   suppliers: { ...p.suppliers, [name]: conf },
                 }),
           };
-          const withInfo = product ? saveProductSupplierInfo(next, product, name, registeredPrice, registeredUnit, productNote) : next;
+          const withInfo = product ? saveProductSupplierNote(next, product, name, productNote) : next;
           const connected = isWholesaleSite(site.title) ? connectWholesaleSites(withInfo, name, productOnly ? product?.baseId : undefined) : withInfo;
           return product && !supplierRows(product).some(row => row.supplier === name)
             ? renameRegisteredSupplier(connected, product, name, registeredSupplierName)
@@ -919,6 +922,7 @@ export default function OrderApp() {
                   onAddSupplier={(p) => edit({ kind: "addSupplier", p })}
                   onChooseSite={(p, supplier) => edit({ kind: "mallSites", p, supplier })}
                   onEditProduct={(p) => edit({ kind: "productEdit", p })}
+                  onPrice={(p, supplier) => edit({ kind: "price", p, supplier })}
                   onSearchName={(p) => edit({ kind: "short", p })}
                   onUnit={(p) => edit({ kind: "unit", p })}
                   onBarcode={(p) => edit({ kind: "barcode", p })}
@@ -1117,6 +1121,7 @@ export default function OrderApp() {
       {dialog &&
         [
           "productEdit",
+          "price",
           "short",
           "unit",
           "barcode",
@@ -1132,6 +1137,7 @@ export default function OrderApp() {
             title={
               {
                 productEdit: "직접 등록한 상품 수정·삭제",
+                price: "상품·매입처별 가격 등록·수정",
                 short: "주문 사이트 검색명",
                 unit: "매입 단위 확인",
                 barcode: "바코드 연결 관리",
@@ -1147,6 +1153,19 @@ export default function OrderApp() {
             onClose={close}
           >
             {notice && <p role="status">{notice}</p>}
+            {dialog.kind === "price" && dialog.p && dialog.supplier && (
+              <>
+                <strong>{dialog.p.name}</strong>
+                <p>{dialog.supplier}</p>
+                <p className="of-muted">이 상품의 이 매입처 가격만 저장합니다. 실제 매입 이력에는 추가하지 않습니다.</p>
+                <label>등록 가격 (원)<input aria-label="등록 가격" inputMode="decimal" value={registeredPrice} onChange={e => setRegisteredPrice(e.target.value)} placeholder="가격 입력 · 비우면 해제" /></label>
+                <label>가격 단위<input aria-label="가격 단위" value={registeredUnit} onChange={e => setRegisteredUnit(e.target.value)} placeholder="개·롤·박스 등" /></label>
+                <button disabled={busy} onClick={() => void run(async () => {
+                  await data.change(p => saveRegisteredPrice(p, dialog.p!, dialog.supplier!, registeredPrice, registeredUnit));
+                  close();
+                })}>저장</button>
+              </>
+            )}
             {dialog.kind === "productEdit" && dialog.p && (
               <>
                 <label>상품 이름<input value={field} onChange={e => setField(e.target.value)} /></label>
@@ -1410,9 +1429,6 @@ export default function OrderApp() {
                   <>
                     <label>매입처 이름<input value={registeredSupplierName} onChange={e => setRegisteredSupplierName(e.target.value)} /></label>
                     <p className="of-muted">이 상품에 등록한 매입처 이름만 변경합니다.</p>
-                    <p className="of-muted">직접 등록한 가격이며 실제 매입 이력에는 추가하지 않습니다.</p>
-                    <label>등록 가격 (원)<input aria-label="등록 가격" inputMode="decimal" value={registeredPrice} onChange={e => setRegisteredPrice(e.target.value)} placeholder="가격 입력 · 비우면 해제" /></label>
-                    <label>가격 단위<input aria-label="가격 단위" value={registeredUnit} onChange={e => setRegisteredUnit(e.target.value)} placeholder="개·롤·박스 등" /></label>
                   </>
                 )}
                 {dialog.p && <label>이 상품의 매입처 비고<textarea value={productNote} onChange={e => setProductNote(e.target.value)} placeholder="배송비, 주문 조건 등" /></label>}

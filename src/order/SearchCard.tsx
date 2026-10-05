@@ -21,6 +21,7 @@ export type CardProps = {
   onOrder: (p: Product, supplier: string, method?: string) => void;
   onScopeOrder: (p: Product, supplier: string) => void;
   onSupplier: (p: Product, name: string) => void;
+  onPrice: (p: Product, name: string) => void;
   onAddSupplier: (p: Product) => void;
   onChooseSite: (p: Product, name: string) => void;
   onSearchName: (p: Product) => void;
@@ -40,6 +41,7 @@ export function SearchCard({
   onOrder,
   onScopeOrder,
   onSupplier,
+  onPrice,
   onAddSupplier,
   onChooseSite,
   onSearchName,
@@ -311,7 +313,7 @@ export function SearchCard({
                 <div><button className="of-vendor-name" onClick={() => onSupplier(p, name)}>{name}</button><small className="of-muted">등록한 매입처 · 매입 기록 없음</small>{prefs.supplierNotes?.[p.baseId + "|" + name] && <small className="of-muted">{prefs.supplierNotes[p.baseId + "|" + name]}</small>}</div>
                 <div className="of-price">
                   {prefs.referencePrices?.[p.baseId + "|" + name] ? <><span>{prefs.referencePrices[p.baseId + "|" + name].amount.toLocaleString("ko-KR", { maximumFractionDigits: 2 })}원 / {prefs.referencePrices[p.baseId + "|" + name].unit}</span><small>등록 가격</small></> : <small>가격 미등록</small>}
-                  <button onClick={() => onSupplier(p, name)}>가격·비고 수정</button>
+                  <button onClick={() => onPrice(p, name)}>{prefs.referencePrices?.[p.baseId + "|" + name] ? "가격 수정" : "가격 등록"}</button>
                 </div>
                 <div className="of-vendor-order"><button className="of-primary of-order" onClick={() => hasOrder(name) ? onOrder(p, name) : onSupplier(p, name)}>{hasOrder(name) ? "바로주문 ↗" : "주소 등록"}</button>
                 {(supplierSetting(name)?.bookmarkIds?.length ?? 0) > 1 && <button onClick={() => onChooseSite(p, name)}>주문처 선택</button>}

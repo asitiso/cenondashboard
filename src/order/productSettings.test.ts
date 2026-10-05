@@ -1,9 +1,20 @@
 import { expect, it } from "vitest";
-import { editManualProduct, isManualProduct, isProductSite, saveProductSupplierInfo, renameRegisteredSupplier } from "./productSettings";
+import { editManualProduct, isManualProduct, isProductSite, saveProductSupplierInfo, saveRegisteredPrice, saveProductSupplierNote, renameRegisteredSupplier } from "./productSettings";
 import { emptyPreferences } from "./storage";
 import { stableId, normalizeName } from "./core";
 import type { Product } from "./types";
 const product: Product = { id: "p", baseId: stableId("manual|" + normalizeName("포장지")), name: "포장지", sourceName: "포장지", manufacturer: "", usage: "retail", matchStatus: "unclassified", latest: [], frequency: [] };
+it("edits prices independently from supplier notes and each supplier's other price", () => {
+  const noted = saveProductSupplierNote(emptyPreferences, product, "네이버쇼핑", "비고");
+  const first = saveRegisteredPrice(noted, product, "네이버쇼핑", "12000", "롤");
+  const second = saveRegisteredPrice(first, product, "온라인팜", "11000", "롤");
+  expect(second.referencePrices?.[product.baseId + "|네이버쇼핑"].amount).toBe(12000);
+  expect(second.referencePrices?.[product.baseId + "|온라인팜"].amount).toBe(11000);
+  expect(second.supplierNotes).toEqual(noted.supplierNotes);
+  const noteEdit = saveProductSupplierNote(second, product, "온라인팜", "배송비");
+  expect(noteEdit.referencePrices).toEqual(second.referencePrices);
+  expect(noteEdit.suppliers).toEqual(emptyPreferences.suppliers);
+});
 it("renames a registered supplier for one product while preserving its settings and other products", () => {
   const p = { ...product, manualSupplier: "네이버쇼핑" }, key = p.baseId + "|네이버쇼핑";
   const original = { ...emptyPreferences, additionalSuppliers: { [p.baseId]: ["온라인팜"] },
