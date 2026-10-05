@@ -1,6 +1,7 @@
 import { expect, it, vi } from "vitest";
-import { addProductSupplier, connectWholesaleSites, confirmRestore } from "./additionalSuppliers";
+import { addProductSupplier, connectWholesaleSites, confirmRestore, registerProductSupplier, wholesaleTitles } from "./additionalSuppliers";
 import { emptyPreferences } from "./storage";
+import { allOrderSites } from "./orderSites";
 
 it("adds an unrecorded supplier once without inventing a purchase", () => {
   const next = addProductSupplier(emptyPreferences, "product", "새 매입처");
@@ -13,10 +14,11 @@ it("connects all three wholesale sites, reusing addresses and defaulting to HMP"
   const next = connectWholesaleSites(prefs, "거래처", "product");
   const conf = next.productSuppliers!["product|거래처"];
   expect(conf.bookmarkIds).toHaveLength(3);
-  expect(next.bookmarks.find(b => b.id === conf.bookmarkId)?.title).toBe("HMP몰");
+  expect(allOrderSites(next).find(b => b.id === conf.bookmarkId)?.title).toBe("HMP몰");
   expect(next.bookmarks.find(b => b.id === "shop")?.url).toBe("https://example.com");
-  expect(next.bookmarks).toHaveLength(3);
-  expect(connectWholesaleSites(next, "거래처", "product").bookmarks).toHaveLength(3);
+  expect(next.bookmarks).toEqual(prefs.bookmarks);
+  expect(next.folders).toEqual(prefs.folders);
+  expect(allOrderSites(connectWholesaleSites(next, "거래처", "product"))).toHaveLength(3);
   expect(next.suppliers).toEqual({});
 });
 it("requires both restoration confirmations and stops immediately on cancellation", () => {
@@ -26,4 +28,13 @@ it("requires both restoration confirmations and stops immediately on cancellatio
   expect(confirmRestore(no, "기준일 2026-10-03")).toBe(false);
   expect(no).toHaveBeenCalledTimes(1);
   expect(confirmRestore(vi.fn().mockReturnValueOnce(true).mockReturnValueOnce(false), "이전 자료")).toBe(false);
+});
+it.each(wholesaleTitles)("selecting %s connects all sites with HMP as default without adding favorites", name => {
+  const next = registerProductSupplier(emptyPreferences, "product", name);
+  expect(next.additionalSuppliers?.product).toEqual(["종합도매"]);
+  const conf = next.productSuppliers!["product|종합도매"];
+  expect(conf.bookmarkIds?.map(id => allOrderSites(next).find(b => b.id === id)?.title)).toEqual(wholesaleTitles);
+  expect(allOrderSites(next).find(b => b.id === conf.bookmarkId)?.title).toBe("HMP몰");
+  expect(next.bookmarks).toEqual([]);
+  expect(next.folders).toEqual([]);
 });

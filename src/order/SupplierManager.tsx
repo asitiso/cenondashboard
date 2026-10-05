@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { normalizeName } from "./core";
 import type { Preferences } from "./types";
+import { allOrderSites } from "./orderSites";
 
 export function removeSupplierSettings(prefs: Preferences, name: string): Preferences {
   const suppliers = { ...prefs.suppliers };
@@ -9,6 +10,7 @@ export function removeSupplierSettings(prefs: Preferences, name: string): Prefer
     ...prefs,
     suppliers,
     additionalSuppliers: Object.fromEntries(Object.entries(prefs.additionalSuppliers ?? {}).map(([id, names]) => [id, names.filter(n => n !== name)])),
+    ...(prefs.orderSites ? { orderSites: prefs.orderSites.map(b => ({ ...b, ...(b.supplierNames ? { supplierNames: b.supplierNames.filter(n => n !== name) } : {}) })) } : {}),
     productSuppliers: Object.fromEntries(
       Object.entries(prefs.productSuppliers ?? {}).filter(([key]) => key.slice(key.indexOf("|") + 1) !== name),
     ),
@@ -28,7 +30,7 @@ export function SupplierManager({ names, prefs, query, onQuery, onEdit, onRemove
   const q = normalizeName(query);
   const rows = names.filter((n) => {
     const conf = prefs.suppliers[n];
-    const site = prefs.bookmarks.find((b) => !b.deletedAt && b.id === conf?.bookmarkId);
+    const site = allOrderSites(prefs).find((b) => b.id === conf?.bookmarkId);
     return normalizeName([n, site?.title, site?.url, conf?.phone, conf?.memo].join(" ")).includes(q);
   });
   return <>
@@ -44,7 +46,7 @@ export function SupplierManager({ names, prefs, query, onQuery, onEdit, onRemove
     <div className="of-supplier-manager">
       {rows.map((n) => {
         const conf = prefs.suppliers[n];
-        const site = prefs.bookmarks.find((b) => !b.deletedAt && b.id === conf?.bookmarkId);
+        const site = allOrderSites(prefs).find((b) => b.id === conf?.bookmarkId);
         const configured = !!conf || Object.keys(prefs.productSuppliers ?? {}).some((k) => k.slice(k.indexOf("|") + 1) === n) || Object.values(prefs.additionalSuppliers ?? {}).some(names => names.includes(n));
         return <div className="of-supplier-manager-row" key={n}>
           <div><strong>{n}</strong><small>{site ? `${site.title} · ${site.url || "주소 미등록"}` : conf?.phone || "주문 정보 미등록"}</small></div>

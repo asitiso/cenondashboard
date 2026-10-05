@@ -1,7 +1,8 @@
 import { normalizeName, stableId } from "./core";
 import type { Preferences } from "./types";
+import { allOrderSites, saveOrderSite } from "./orderSites";
 
-const wholesaleTitles = ["HMP몰", "바로팜", "theSHOP"];
+export const wholesaleTitles = ["HMP몰", "바로팜", "theSHOP"];
 export const isWholesaleSite = (title: string) => wholesaleTitles.some(t => normalizeName(t) === normalizeName(title));
 export function addProductSupplier(p: Preferences, id: string, name: string): Preferences {
   const clean = name.trim();
@@ -9,21 +10,24 @@ export function addProductSupplier(p: Preferences, id: string, name: string): Pr
   return { ...p, additionalSuppliers: { ...p.additionalSuppliers, [id]: [...new Set([...(p.additionalSuppliers?.[id] ?? []), clean])] } };
 }
 export function connectWholesaleSites(p: Preferences, name: string, productId?: string): Preferences {
-  const bookmarks = [...p.bookmarks];
-  const folderId = p.folders[0]?.id ?? "order-default";
-  const folders = p.folders.length ? p.folders : [{ id: folderId, name: "주문처", parentId: null, category: "종합도매", order: 0 }];
+  let next = p;
   const ids = wholesaleTitles.map(title => {
-    let site = bookmarks.find(b => !b.deletedAt && normalizeName(b.title) === normalizeName(title));
+    let site = allOrderSites(next).find(b => normalizeName(b.title) === normalizeName(title));
     if (!site) {
-      site = { id: stableId("wholesale|" + title), title, url: "", folderId, category: "종합도매", memo: "" };
-      bookmarks.push(site);
+      site = { id: stableId("wholesale|" + title), title, url: "", folderId: "", category: "종합도매", memo: "" };
+      next = saveOrderSite(next, site);
     }
     return site.id;
   });
   const key = productId + "|" + name;
   const previous = productId ? p.productSuppliers?.[key] ?? p.suppliers[name] : p.suppliers[name];
   const conf = { ...previous, bookmarkId: ids[0], bookmarkIds: ids, method: "사이트" as const, methods: ["사이트"], memo: previous?.memo ?? "" };
-  return { ...p, bookmarks, folders, ...(productId ? { productSuppliers: { ...p.productSuppliers, [key]: conf } } : { suppliers: { ...p.suppliers, [name]: conf } }) };
+  return { ...next, ...(productId ? { productSuppliers: { ...next.productSuppliers, [key]: conf } } : { suppliers: { ...next.suppliers, [name]: conf } }) };
+}
+export function registerProductSupplier(p: Preferences, id: string, name: string): Preferences {
+  const wholesale = isWholesaleSite(name) || name === "종합도매";
+  const next = addProductSupplier(p, id, wholesale ? "종합도매" : name);
+  return wholesale ? connectWholesaleSites(next, "종합도매", id) : next;
 }
 export function confirmRestore(confirm: (text: string) => boolean, description: string) {
   return confirm(`경고: 현재 공용 매입 자료가 이 브라우저에 보관된 직전 자료로 바뀝니다. 다른 직원의 조회 결과에도 적용됩니다.\n복원 대상: ${description}\n즐겨찾기·바코드·주문처 설정은 유지됩니다.\n복원을 진행할까요? (1/2)`)

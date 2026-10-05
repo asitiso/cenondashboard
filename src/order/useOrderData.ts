@@ -13,6 +13,7 @@ import {
   writeCache,
 } from "./storage";
 import type { Preferences, Snapshot, UsageDay } from "./types";
+import { separateAutomaticSites } from "./orderSites";
 
 export function useOrderData() {
   const [snapshot, setSnapshot] = useState<Snapshot>();
@@ -42,7 +43,7 @@ export function useOrderData() {
         ]);
         if (!live) return;
         if (s) setSnapshot(s);
-        if (p) setPreferences(p);
+        if (p) setPreferences(separateAutomaticSites(p));
         if (d) setDays(d);
         if (!s && import.meta.env.DEV && !isFirebaseConfigured) {
           const response = await fetch("/__order-preview");
@@ -69,9 +70,10 @@ export function useOrderData() {
           ),
           watchPreferences((v) => {
             if (live) {
-              setPreferences(v);
-              prefRef.current = v;
-              void writeCache("preferences", v).catch((e) =>
+              const separated = separateAutomaticSites(v);
+              setPreferences(separated);
+              prefRef.current = separated;
+              void writeCache("preferences", separated).catch((e) =>
                 setError(String(e)),
               );
             }
@@ -125,7 +127,7 @@ export function useOrderData() {
     const task = mutationQueue.current
       .catch(() => {})
       .then(async () => {
-        const next = await mutatePreferences(prefRef.current, fn);
+        const next = await mutatePreferences(prefRef.current, p => fn(separateAutomaticSites(p)));
         prefRef.current = next;
         setPreferences(next);
       });

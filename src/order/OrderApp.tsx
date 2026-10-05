@@ -7,7 +7,8 @@ import { SearchCard } from "./SearchCard";
 import { BarcodeCamera } from "./BarcodeCamera";
 import { SupplierManager, removeSupplierSettings } from "./SupplierManager";
 import { AddSupplier } from "./AddSupplier";
-import { addProductSupplier, connectWholesaleSites, isWholesaleSite, confirmRestore } from "./additionalSuppliers";
+import { registerProductSupplier, connectWholesaleSites, isWholesaleSite, confirmRestore } from "./additionalSuppliers";
+import { allOrderSites, saveOrderSite } from "./orderSites";
 import {
   barcodeLink,
   displayPrice,
@@ -120,6 +121,7 @@ export default function OrderApp() {
   const [newUsage, setNewUsage] = useState<Usage>("retail");
   const [supplierQuery, setSupplierQuery] = useState("");
   const active = prefs.bookmarks.filter((b) => !b.deletedAt),
+    orderSites = allOrderSites(prefs),
     products = useMemo(() => {
       const grouped = new Map<string, Product[]>();
       for (const p of snapshot?.products ?? [])
@@ -165,7 +167,7 @@ export default function OrderApp() {
       !scope && q ? managedSuppliers.filter((n) => normalizeName(n).includes(q)) : [];
   const siteCandidates =
     !scope && q
-      ? active.filter((b) => normalizeName(b.title + " " + b.memo).includes(q))
+      ? orderSites.filter((b) => normalizeName(b.title + " " + b.memo).includes(q))
       : [];
   const exact = supplierCandidates.find((n) => normalizeName(n) === q);
   const context = scope?.names ?? (exact ? [exact] : []);
@@ -224,6 +226,7 @@ export default function OrderApp() {
     deferred,
     prefs.barcodes,
     prefs.bookmarks,
+    prefs.orderSites,
     prefs.additionalSuppliers,
     scope,
     sort,
@@ -256,7 +259,7 @@ export default function OrderApp() {
       const conf =
           prefs.productSuppliers?.[d.p?.baseId + "|" + d.supplier] ??
           prefs.suppliers[d.supplier],
-        link = active.find((b) => b.id === conf?.bookmarkId);
+        link = orderSites.find((b) => b.id === conf?.bookmarkId);
       setChosenSite(link?.id ?? "");
       setSiteQuery("");
       setAddress(link?.url ?? "");
@@ -325,8 +328,8 @@ export default function OrderApp() {
         prefs.productSuppliers?.[p.baseId + "|" + name] ??
         prefs.suppliers[name],
       link =
-        active.find((b) => b.id === (siteId ?? conf?.bookmarkId)) ??
-        active.find((b) => b.title === name),
+        orderSites.find((b) => b.id === (siteId ?? conf?.bookmarkId)) ??
+        orderSites.find((b) => b.title === name),
       mode =
         selectedMode ??
         conf?.methods?.[0] ??
@@ -430,33 +433,20 @@ export default function OrderApp() {
             phone,
           };
           const previous = p.suppliers[name]?.bookmarkId;
-          if (!onlyProduct && previous && previous !== conf.bookmarkId && dialog.from !== "suppliers")
+          if (!onlyProduct && previous && previous !== conf.bookmarkId && dialog.from !== "suppliers" && !isWholesaleSite(allOrderSites(p).find(b => b.id === conf.bookmarkId)?.title ?? ""))
             throw Error(
               "기존 연결을 유지하세요. 상품별 예외 주문처는 ‘이 상품만 적용’을 선택하여 지정할 수 있습니다.",
             );
           const productSuppliers = { ...p.productSuppliers };
           if (!onlyProduct && product)
             delete productSuppliers[product.baseId + "|" + name];
-          const existing = p.bookmarks.find((b) => b.id === conf.bookmarkId);
-          let folders = p.folders;
-          const folderId =
-            existing?.folderId ?? p.folders[0]?.id ?? "order-default";
-          if (!folders.length)
-            folders = [
-              {
-                id: folderId,
-                name: "주문처",
-                parentId: null,
-                category: "종합도매",
-                order: 0,
-              },
-            ];
+          const existing = allOrderSites(p).find((b) => b.id === conf.bookmarkId);
           const site: Bookmark = {
             ...existing,
             id: conf.bookmarkId!,
             title: existing?.title ?? name,
             url: url || "",
-            folderId,
+            folderId: existing?.folderId ?? "",
             category: existing?.category ?? "종합도매",
             memo,
             phone,
@@ -466,11 +456,7 @@ export default function OrderApp() {
             ],
           };
           const next = {
-            ...p,
-            folders,
-            bookmarks: existing
-              ? p.bookmarks.map((b) => (b.id === existing.id ? site : b))
-              : [...p.bookmarks, site],
+            ...saveOrderSite(p, site),
             ...(onlyProduct && product
               ? {
                   productSuppliers: {
@@ -760,7 +746,7 @@ export default function OrderApp() {
                                 (p) =>
                                   supplierRows(p).some(
                                     (r) => r.supplier === name,
-                                  ) || p.manualSupplier === name,
+                                  ) || p.manualSupplier === name || (prefs.additionalSuppliers?.[p.baseId] ?? []).includes(name),
                               )
                               .reduce(
                                 (s, p) => s.add(p.baseId),
@@ -774,9 +760,9 @@ export default function OrderApp() {
                         onClick={(e) => {
                           e.stopPropagation();
                           const link =
-                            active.find(
+                            orderSites.find(
                               (b) => b.id === prefs.suppliers[name]?.bookmarkId,
-                            ) ?? active.find((b) => b.title === name);
+                            ) ?? orderSites.find((b) => b.title === name);
                           if (link) openSite(link);
                           else edit({ kind: "supplier", supplier: name });
                         }}
@@ -796,8 +782,8 @@ export default function OrderApp() {
                   <button
                     onClick={() => {
                       const link =
-                        active.find((b) => b.title === scope.name) ??
-                        active.find(
+                        orderSites.find((b) => b.title === scope.name) ??
+                        orderSites.find(
                           (b) =>
                             b.id ===
                             prefs.suppliers[scope.names[0]]?.bookmarkId,
@@ -1120,16 +1106,15 @@ export default function OrderApp() {
             onClose={close}
           >
             {notice && <p role="status">{notice}</p>}
-            {dialog.kind === "addSupplier" && dialog.p && <AddSupplier names={managedSuppliers} existing={[...supplierRows(dialog.p).map(r => r.supplier), ...(prefs.additionalSuppliers?.[dialog.p.baseId] ?? [])]} busy={busy} onAdd={(name, wholesale) => void run(async () => {
+            {dialog.kind === "addSupplier" && dialog.p && <AddSupplier names={managedSuppliers} existing={[...supplierRows(dialog.p).map(r => r.supplier), ...(prefs.additionalSuppliers?.[dialog.p.baseId] ?? [])]} busy={busy} onAdd={(name) => void run(async () => {
               await data.change(p => {
-                const next = addProductSupplier(p, dialog.p!.baseId, name);
-                return wholesale ? connectWholesaleSites(next, name, dialog.p!.baseId) : next;
+                return registerProductSupplier(p, dialog.p!.baseId, name);
               });
               close();
             })} />}
             {dialog.kind === "mallSites" && dialog.p && dialog.supplier && <div className="of-actions">
               {((prefs.productSuppliers?.[dialog.p.baseId + "|" + dialog.supplier] ?? prefs.suppliers[dialog.supplier])?.bookmarkIds ?? []).map((id, i) => {
-                const b = active.find(site => site.id === id);
+                const b = orderSites.find(site => site.id === id);
                 return b ? <button key={id} onClick={() => order(dialog.p!, dialog.supplier!, "사이트", id)}>{b.title}{i === 0 ? " · 기본" : ""}{!b.url ? " · 주소 등록 필요" : " ↗"}</button> : null;
               })}
             </div>}
@@ -1315,8 +1300,9 @@ export default function OrderApp() {
             {dialog.kind === "supplier" && (
               <>
                 <h3>{dialog.supplier}</h3>
-                {chosenSite && namesForSite(active.find((b) => b.id === chosenSite)).length > 1 && (
-                  <p className="of-muted">공통 주소를 수정하면 함께 연결된 거래처에도 반영됩니다: {namesForSite(active.find((b) => b.id === chosenSite)).join(", ")}</p>
+                <p className="of-muted">매입처 주소 저장은 즐겨찾기를 추가하지 않습니다.</p>
+                {chosenSite && namesForSite(orderSites.find((b) => b.id === chosenSite)).length > 1 && (
+                  <p className="of-muted">공통 주소를 수정하면 함께 연결된 거래처에도 반영됩니다: {namesForSite(orderSites.find((b) => b.id === chosenSite)).join(", ")}</p>
                 )}
                 <label>
                   연결 사이트
@@ -1331,13 +1317,13 @@ export default function OrderApp() {
                     value={chosenSite}
                     onChange={(e) => {
                       setChosenSite(e.target.value);
-                      const site = active.find((b) => b.id === e.target.value);
+                      const site = orderSites.find((b) => b.id === e.target.value);
                       setAddress(site?.url ?? "");
                       setPhone(site?.phone ?? "");
                     }}
                   >
                     <option value="">새 주문처 등록</option>
-                    {active
+                    {orderSites
                       .filter((b) =>
                         b.id === chosenSite ||
                         normalizeName(b.title).includes(normalizeName(siteQuery)),

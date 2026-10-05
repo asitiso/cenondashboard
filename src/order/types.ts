@@ -97,6 +97,7 @@ export interface SupplierSetting {
   memo: string;
 }
 export interface Preferences {
+  orderSites?: Bookmark[];
   additionalSuppliers?: Record<string, string[]>;
   barcodes?: Record<string, string[]>;
   searchNames?: Record<string, string>;

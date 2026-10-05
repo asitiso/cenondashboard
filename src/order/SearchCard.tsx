@@ -8,6 +8,7 @@ import {
   allReceipts,
 } from "./workspace";
 import { yearStart } from "./core";
+import { allOrderSites } from "./orderSites";
 export type CardProps = {
   product: Product;
   preferences: Preferences;
@@ -56,7 +57,7 @@ export function SearchCard({
   const supplierSetting = (name: string) =>
     prefs.productSuppliers?.[p.baseId + "|" + name] ?? prefs.suppliers[name];
   const site = (name: string) =>
-    prefs.bookmarks.find(
+    allOrderSites(prefs).find(
       (b) => !b.deletedAt && b.id === supplierSetting(name)?.bookmarkId,
     );
   const hasOrder = (name: string) =>
