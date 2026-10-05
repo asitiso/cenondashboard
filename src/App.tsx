@@ -262,7 +262,7 @@ function ItemRow({
                   <strong>{fact.value}</strong>
                 </button>
               ) : (
-                <span className={`drug-fact ${fact.label === "상태" ? `drug-status ${fact.value}` : ""}`} key={fact.label}>
+                <span className={`drug-fact ${fact.label === "상태" ? `drug-status ${fact.value}` : fact.label === "남은" ? "drug-remaining" : "drug-secondary"}`} key={fact.label}>
                   {fact.label !== "남은" && <small>{fact.label}</small>}
                   <strong>{fact.value}</strong>
                 </span>
@@ -462,8 +462,12 @@ function DetailOverlay({
     <div className="detail-overlay" role="dialog" aria-modal="true">
       <button className="overlay-backdrop" onClick={onClose} aria-label="상세 닫기" />
       <div className="overlay-panel">
-        <button className="close-button" onClick={onClose} aria-label="상세 닫기"><X size={18} /></button>
-        <DetailPanel item={item} onSetManualStatus={onSetManualStatus} onEditManual={onEditManual} onDeleteManual={onDeleteManual} onToggleDrugPriority={onToggleDrugPriority} />
+        <div className="detail-overlay-toolbar">
+          <button onClick={onClose} aria-label="목록으로 돌아가기"><X size={18} /> 목록으로</button>
+        </div>
+        <div className="detail-overlay-body">
+          <DetailPanel item={item} onSetManualStatus={onSetManualStatus} onEditManual={onEditManual} onDeleteManual={onDeleteManual} onToggleDrugPriority={onToggleDrugPriority} />
+        </div>
       </div>
     </div>
   );
@@ -782,7 +786,7 @@ function ListView({
       {drugMode && (
         <div className="category-chips compact" aria-label="유기관리 상태">
           {(["all", "긴급", "주의", "양호"] as DrugStatusFilter[]).map((entry) => (
-            <button key={entry} className={drugStatus === entry ? "selected" : ""} onClick={() => setDrugStatus(entry)}>
+            <button key={entry} className={`drug-status ${entry} ${drugStatus === entry ? "selected" : ""}`} onClick={() => setDrugStatus(entry)}>
               {entry === "all" ? "전체" : entry}
             </button>
           ))}
@@ -889,9 +893,7 @@ function OperationsDashboard() {
     setSelected(item);
     if (window.innerWidth <= COMPACT_LAYOUT_MAX_WIDTH) {
       setDetailPanelOffset(0);
-      window.requestAnimationFrame(() => {
-        detailPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
+      setOverlayOpen(true);
       return;
     }
     window.requestAnimationFrame(() => {
@@ -1032,6 +1034,14 @@ function OperationsDashboard() {
             >
               <DetailPanel item={selected} onSetManualStatus={setManualReviewStatus} onEditManual={editManual} onDeleteManual={deleteManual} onToggleDrugPriority={toggleDrugPriority} />
             </div>
+            <DetailOverlay
+              item={overlayOpen ? selected : undefined}
+              onClose={() => setOverlayOpen(false)}
+              onSetManualStatus={setManualReviewStatus}
+              onEditManual={editManual}
+              onDeleteManual={deleteManual}
+              onToggleDrugPriority={toggleDrugPriority}
+            />
           </div>
         )}
         {manualEditor && (

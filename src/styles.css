@@ -1828,3 +1828,33 @@ h2 {
 @media (max-width: 800px) {
   .of-app .of-search { top: var(--app-topbar-height); }
 }
+
+/* Drug status is a deliberate color exception to the monochrome workspace. */
+.app-shell .drug-status.긴급 { border-color: #e6aaa7; background: #fff0ef; color: #a7231d; }
+.app-shell .drug-status.주의 { border-color: #dfc285; background: #fff8e7; color: #805600; }
+.app-shell .drug-status.양호 { border-color: #a8cdb2; background: #edf7ef; color: #246439; }
+.app-shell .first-toggle { background: #fff; border-color: #aaa; color: #333; }
+.app-shell .first-toggle.selected,
+.app-shell .drug-detail-actions button.selected { background: #b52b25; border-color: #b52b25; color: #fff; }
+.app-shell .first-toggle.selected strong { color: #fff; }
+.app-shell .detail-overlay { top: var(--app-topbar-height); z-index: 50; }
+.app-shell .detail-overlay .overlay-panel {
+  height: calc(100dvh - var(--app-topbar-height));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+.detail-overlay-toolbar { flex: none; padding: 8px 12px; border-bottom: 1px solid #ccc; background: #fff; }
+.detail-overlay-toolbar button { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 10px; border: 1px solid #aaa; background: #fff; color: #333; }
+.detail-overlay-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 10px; }
+@media (max-width: 980px) {
+  .app-shell .detail-panel-anchor { display: none; }
+}
+@media (max-width: 760px) {
+  .app-shell .drug-fact-strip { gap: 5px; margin-top: 6px; }
+  .app-shell .drug-fact-strip .first-toggle { order: -2; min-height: 32px; }
+  .app-shell .drug-fact-strip .drug-remaining { order: -1; }
+  .app-shell .drug-fact-strip .drug-secondary { display: none; }
+  .app-shell .drug-list-row .row-meta { display: none; }
+}
