@@ -6,6 +6,8 @@ import {
   buildPurchaseAnalysis,
   matchesAnalysis,
   groupVendorPrices,
+  sortPriceChanges,
+  type PriceChangeSort,
   type VendorPrice,
 } from "./analytics";
 import "./analytics.css";
@@ -15,6 +17,11 @@ const labels: Record<Mode, string> = {
   rises: "가격 상승",
   gaps: "매입처별 가격",
   frequent: "자주 매입하는 품목",
+};
+const sortLabels: Record<PriceChangeSort, string> = {
+  recent: "최근 매입순",
+  rate: "상승률 높은순",
+  amount: "가격 변화 큰순",
 };
 const money = (n: number) =>
   n.toLocaleString("ko-KR", { maximumFractionDigits: 2 });
@@ -53,11 +60,12 @@ export default function PurchaseAnalysis({
   const [supplier, setSupplier] = useState("");
   const [limit, setLimit] = useState(50);
   const [change, setChange] = useState("rise");
+  const [order, setOrder] = useState<PriceChangeSort>("recent");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [top, setTop] = useState(false);
   useEffect(() => {
     setLimit(50);
-  }, [mode, query, supplier, change]);
+  }, [mode, query, supplier, change, order]);
   useEffect(() => {
     const scroll = () => setTop(window.scrollY > 300);
     window.addEventListener("scroll", scroll, { passive: true });
@@ -84,9 +92,11 @@ export default function PurchaseAnalysis({
           all: "가격 변화",
         }[change]
       : labels[mode];
-  const filtered = source.filter((item) =>
+  const matched = source.filter((item) =>
     matchesAnalysis(item, query, supplier),
   );
+  const filtered =
+    mode === "rises" ? sortPriceChanges(matched, order) : matched;
   return (
     <div className="of-app pa-app">
       <main className="pa-main">
@@ -171,11 +181,28 @@ export default function PurchaseAnalysis({
               <h2>
                 {title} · {filtered.length.toLocaleString()}개
               </h2>
-              <small>
-                {mode === "frequent"
-                  ? "최근 1년 매입 기록 많은 순"
-                  : "최근 매입 날짜순"}
-              </small>
+              {mode === "rises" ? (
+                <nav className="pa-sort" aria-label="가격 변화 정렬">
+                  {(Object.keys(sortLabels) as PriceChangeSort[]).map(
+                    (value) => (
+                      <button
+                        key={value}
+                        aria-pressed={order === value}
+                        className={order === value ? "of-primary" : ""}
+                        onClick={() => setOrder(value)}
+                      >
+                        {sortLabels[value]}
+                      </button>
+                    ),
+                  )}
+                </nav>
+              ) : (
+                <small>
+                  {mode === "frequent"
+                    ? "최근 1년 매입 기록 많은 순"
+                    : "최근 매입 날짜순"}
+                </small>
+              )}
             </div>
             <p className="of-muted pa-scope">
               {mode === "frequent"

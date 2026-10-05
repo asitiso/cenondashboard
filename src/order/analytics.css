@@ -57,6 +57,18 @@
 .pa-scope {
   margin: 2px 0 12px;
 }
+.pa-caption {
+  flex-wrap: wrap;
+}
+.pa-sort {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+}
+.of-app .pa-sort button {
+  padding: 5px 8px;
+  font-size: 12px;
+}
 .pa-row {
   position: relative;
   display: grid;

@@ -25,6 +25,22 @@ export type AnalysisItem = {
   };
 };
 const roundedPrice = (amount: number) => Math.round(amount * 100) / 100;
+export type PriceChangeSort = "recent" | "rate" | "amount";
+export function sortPriceChanges(
+  items: AnalysisItem[],
+  order: PriceChangeSort,
+): AnalysisItem[] {
+  return [...items].sort((a, b) => {
+    const difference =
+      order === "rate"
+        ? (b.increase?.percent ?? 0) - (a.increase?.percent ?? 0)
+        : order === "amount"
+          ? Math.abs(b.increase?.difference ?? 0) -
+            Math.abs(a.increase?.difference ?? 0)
+          : 0;
+    return difference || b.latestDate.localeCompare(a.latestDate);
+  });
+}
 export function groupVendorPrices(values: VendorPrice[]): VendorPrice[] {
   const groups = new Map<string, VendorPrice>();
   for (const value of values) {

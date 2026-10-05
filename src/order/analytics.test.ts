@@ -1,5 +1,9 @@
 import { expect, it } from "vitest";
-import { buildPurchaseAnalysis, groupVendorPrices } from "./analytics";
+import {
+  buildPurchaseAnalysis,
+  groupVendorPrices,
+  sortPriceChanges,
+} from "./analytics";
 import { emptyPreferences } from "./storage";
 import type { Product, Purchase, Snapshot } from "./types";
 const receipt = (
@@ -44,6 +48,47 @@ const prefs = {
     },
   },
 };
+it("sorts price changes by date, percentage or absolute amount without changing the source", () => {
+  const make = (
+    baseId: string,
+    date: string,
+    current: number,
+    previous: number,
+  ) => ({
+    ...product([
+      receipt(date, "A", current),
+      receipt("2026-01-01", "A", previous),
+    ]),
+    baseId,
+  });
+  const data = buildPurchaseAnalysis(
+    snapshot([
+      make("recent", "2026-10-03", 110, 100),
+      make("rate", "2026-10-02", 20, 10),
+      make("amount", "2026-10-01", 1500, 1000),
+      make("fall", "2026-09-30", 100, 800),
+    ]),
+    emptyPreferences,
+  ).changes;
+  expect(sortPriceChanges(data, "recent").map((x) => x.product.baseId)).toEqual(
+    ["recent", "rate", "amount", "fall"],
+  );
+  expect(sortPriceChanges(data, "rate").map((x) => x.product.baseId)).toEqual([
+    "rate",
+    "amount",
+    "recent",
+    "fall",
+  ]);
+  expect(sortPriceChanges(data, "amount").map((x) => x.product.baseId)).toEqual(
+    ["fall", "amount", "recent", "rate"],
+  );
+  expect(data.map((x) => x.product.baseId)).toEqual([
+    "recent",
+    "rate",
+    "amount",
+    "fall",
+  ]);
+});
 it("compares confirmed prices and records each supplier's date", () => {
   const p = product([
     receipt("2026-10-02", "A", 120),
