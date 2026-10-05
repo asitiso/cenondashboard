@@ -534,6 +534,10 @@ button {
   text-align: right;
 }
 
+.dense-priority-toggle {
+  display: none;
+}
+
 .compact-empty {
   display: grid;
   place-items: center;
@@ -1658,26 +1662,45 @@ h2 {
   }
 
   .drug-row {
-    grid-template-columns: 10px minmax(0, 1fr) auto;
-    grid-template-areas:
-      "dot title due"
-      "dot meta meta";
-    row-gap: 3px;
+    grid-template-columns: 10px minmax(0, 1fr) auto auto auto;
+    grid-template-areas: "dot title meta due action";
+    column-gap: 5px;
+    row-gap: 0;
   }
 
   .drug-row .dense-meta,
   .drug-row .dense-due {
     display: block;
+    max-width: none;
+    text-align: right;
+    font-size: 11px;
   }
 
-  .drug-row .dense-meta {
-    max-width: none;
-    text-align: left;
+  .drug-row .dense-priority-toggle {
+    display: inline-flex;
+    grid-area: action;
+    align-items: center;
+    justify-content: center;
+    min-height: 26px;
+    padding: 0 7px;
+    border: 1px solid #e2a3a3;
+    border-radius: 999px;
+    background: #fff6f6;
+    color: #b23a3a;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .drug-row .dense-priority-toggle.selected {
+    border-color: #d64545;
+    background: #d64545;
+    color: #ffffff;
   }
 
   .app-shell .dense-row.drug-row {
-    min-height: 50px;
-    grid-template-rows: minmax(18px, auto) minmax(17px, auto);
+    min-height: 38px;
+    grid-template-rows: 1fr;
   }
 
   .row-meta {
