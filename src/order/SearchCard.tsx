@@ -95,6 +95,14 @@ export function SearchCard({
         isWholesaleSite(orderSites.find((site) => site.id === id)?.title ?? ""),
       );
   };
+  const orderButtonLabel = (name: string) => {
+    if (!isWholesaleSupplier(name)) return "바로주문";
+    const target = supplierSetting(name)?.wholesaleTarget ?? "choose";
+    if (target === "HMP몰") return "HMP몰";
+    if (target === "바로팜") return "바로팜";
+    if (target === "theSHOP") return "the Shop";
+    return "종합도매";
+  };
   const referenceSupplier = [...(prefs.additionalSuppliers?.[p.baseId] ?? []), ...(p.manualSupplier ? [p.manualSupplier] : [])]
     .find(name => (!scope.length || scope.includes(name)) && !!prefs.referencePrices?.[p.baseId + "|" + name]);
   const reference = referenceSupplier ? prefs.referencePrices?.[p.baseId + "|" + referenceSupplier] : undefined;
@@ -173,7 +181,7 @@ export function SearchCard({
             className="of-primary of-order"
             onClick={() => onScopeOrder(p, selected.supplier)}
           >
-            {isWholesaleSupplier(selected.supplier) ? "종합도매" : "바로주문 ↗"}
+            {orderButtonLabel(selected.supplier)}
           </button>
         )}
       </div>
@@ -313,11 +321,9 @@ export function SearchCard({
                     }
                   >
                     {hasOrder(r.supplier)
-                      ? wholesale
-                        ? "종합도매"
-                        : methods[0] === "사이트"
-                          ? "바로주문 ↗"
-                          : methods[0]
+                      ? wholesale || methods[0] === "사이트"
+                        ? orderButtonLabel(r.supplier)
+                        : methods[0]
                       : "주소 등록"}
                   </button>
                   {!wholesale && (config?.bookmarkIds?.length ?? 0) > 1 && <button onClick={() => onChooseSite(p, r.supplier)}>주문처 선택</button>}
@@ -368,7 +374,7 @@ export function SearchCard({
                   {prefs.referencePrices?.[p.baseId + "|" + name] ? <><span>{prefs.referencePrices[p.baseId + "|" + name].amount.toLocaleString("ko-KR", { maximumFractionDigits: 2 })}원 / {prefs.referencePrices[p.baseId + "|" + name].unit}</span><small>등록 가격</small></> : <small>가격 미등록</small>}
                   <button onClick={() => onPrice(p, name)}>{prefs.referencePrices?.[p.baseId + "|" + name] ? "가격 수정" : "가격 등록"}</button>
                 </div>
-                <div className="of-vendor-order"><button className="of-primary of-order" onClick={() => hasOrder(name) ? onOrder(p, name) : onSupplier(p, name)}>{hasOrder(name) ? (isWholesaleSupplier(name) ? "종합도매" : "바로주문 ↗") : "주소 등록"}</button>
+                <div className="of-vendor-order"><button className="of-primary of-order" onClick={() => hasOrder(name) ? onOrder(p, name) : onSupplier(p, name)}>{hasOrder(name) ? orderButtonLabel(name) : "주소 등록"}</button>
                 {!isWholesaleSupplier(name) && (supplierSetting(name)?.bookmarkIds?.length ?? 0) > 1 && <button onClick={() => onChooseSite(p, name)}>주문처 선택</button>}
                 </div>
               </div>
