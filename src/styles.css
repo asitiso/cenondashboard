@@ -1749,7 +1749,8 @@ h2 {
 .app-shell .order-top-tabs button.active:after { display: none; }
 .app-shell h1 { font-size: 25px; font-weight: 600; }
 .app-shell h2 { font-weight: 600; }
-.app-shell .dense-row strong { font-size: 14px; }
+.app-shell .dense-row strong { font-size: 14px; font-weight: 400; }
+.app-shell .row-title strong { font-weight: 400; }
 .app-shell .summary-card, .app-shell .compact-metric { border: 1px solid #ccc; }
 .app-shell .error-strip, .app-shell .status-overdue, .app-shell .drug-fact.drug-status.긴급 { border: 1px solid #777; }
 .app-shell .urgency-dot.critical { background: #222; }

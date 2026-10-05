@@ -221,11 +221,13 @@ export default function PurchaseAnalysis({
                             ? "가격 동일"
                             : `${item.increase.difference > 0 ? "▲" : "▼"} ${percent(item.increase.percent)}`}
                         </strong>
-                        <small>
+                        <strong
+                          className={`pa-change-badge ${item.increase.difference > 0 ? "pa-rise" : item.increase.difference < 0 ? "pa-fall" : "pa-same"}`}
+                        >
                           {item.increase.difference === 0
                             ? "변동 없음"
-                            : `${item.increase.difference > 0 ? "+" : "−"}${money(Math.abs(item.increase.difference))}원 ${item.increase.difference > 0 ? "상승" : "하락"}`}
-                        </small>
+                            : `${item.increase.difference > 0 ? "+" : "−"}${money(Math.abs(item.increase.difference))}원`}
+                        </strong>
                         {item.increase.current.supplier !==
                           item.increase.previous.supplier && (
                           <span className="pa-tag">매입처 변경</span>

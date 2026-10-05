@@ -99,6 +99,9 @@
   color: #b42318;
   background: #fee9e7;
 }
+.pa-rises .pa-change-badge {
+  font-size: 14px;
+}
 .pa-fall {
   color: #1753a0;
   background: #e7f0fc;
@@ -233,6 +236,9 @@
   }
   .pa-change-badge {
     font-size: 14px;
+  }
+  .pa-rises .pa-change-badge {
+    font-size: 12px;
   }
   .pa-vendor-price {
     gap: 3px 6px;
