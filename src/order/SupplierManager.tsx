@@ -45,7 +45,7 @@ export function SupplierManager({ names, prefs, query, onQuery, onEdit, onRemove
       {rows.map((n) => {
         const conf = prefs.suppliers[n];
         const site = prefs.bookmarks.find((b) => !b.deletedAt && b.id === conf?.bookmarkId);
-        const configured = !!conf || Object.keys(prefs.productSuppliers ?? {}).some((k) => k.slice(k.indexOf("|") + 1) === n);
+        const configured = !!conf || Object.keys(prefs.productSuppliers ?? {}).some((k) => k.slice(k.indexOf("|") + 1) === n) || Object.values(prefs.additionalSuppliers ?? {}).some(names => names.includes(n));
         return <div className="of-supplier-manager-row" key={n}>
           <div><strong>{n}</strong><small>{site ? `${site.title} · ${site.url || "주소 미등록"}` : conf?.phone || "주문 정보 미등록"}</small></div>
           <div className="of-actions">
