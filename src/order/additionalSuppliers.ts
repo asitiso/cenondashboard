@@ -22,7 +22,17 @@ export function connectWholesaleSites(p: Preferences, name: string, productId?: 
   });
   const key = productId + "|" + name;
   const previous = productId ? p.productSuppliers?.[key] ?? p.suppliers[name] : p.suppliers[name];
-  const conf = { ...previous, bookmarkId: ids[0], bookmarkIds: ids, method: "사이트" as const, methods: ["사이트"], memo: previous?.memo ?? "" };
+  const wholesaleTarget = previous?.wholesaleTarget ?? "choose";
+  const fixedIndex = wholesaleTitles.findIndex(title => normalizeName(title) === normalizeName(wholesaleTarget));
+  const conf = {
+    ...previous,
+    bookmarkId: fixedIndex >= 0 ? ids[fixedIndex] : ids[0],
+    bookmarkIds: ids,
+    wholesaleTarget,
+    method: "사이트" as const,
+    methods: ["사이트"],
+    memo: previous?.memo ?? "",
+  };
   return { ...next, ...(productId ? { productSuppliers: { ...next.productSuppliers, [key]: conf } } : { suppliers: { ...next.suppliers, [name]: conf } }) };
 }
 export function registerProductSupplier(p: Preferences, id: string, name: string): Preferences {
