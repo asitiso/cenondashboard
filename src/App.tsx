@@ -265,7 +265,7 @@ function ItemRow({
                   <strong>{fact.value}</strong>
                 </button>
               ) : (
-                <span className={`drug-fact ${fact.label === "상태" ? `drug-status ${fact.value}` : fact.label === "남은" ? "drug-remaining" : "drug-secondary"}`} key={fact.label}>
+                <span className={`drug-fact ${fact.label === "상태" ? `drug-status ${fact.value}` : fact.label === "남은" ? "drug-remaining" : fact.label === "유효" ? "drug-expiry" : "drug-secondary"}`} key={fact.label}>
                   {fact.label !== "남은" && <small>{fact.label}</small>}
                   <strong>{fact.value}</strong>
                 </span>

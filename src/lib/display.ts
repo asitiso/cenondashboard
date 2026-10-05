@@ -37,13 +37,18 @@ export function formatKoreanDate(date?: Date): string {
   }).format(date);
 }
 
+export function formatExpiryDate(date?: Date): string {
+  if (!date) return "-";
+  return `${String(date.getFullYear()).slice(-2)}년${date.getMonth() + 1}월${date.getDate()}일`;
+}
+
 export function getDenseRowMeta(item: DashboardItem): string {
-  if (item.kind === "drug") return item.dueAt ? formatKoreanDate(item.dueAt) : item.description;
+  if (item.kind === "drug") return item.dueAt ? formatExpiryDate(item.dueAt) : item.description;
   return item.owner;
 }
 
 export function getDenseRowTimeLabel(item: DashboardItem): string {
-  const date = formatKoreanDate(item.dueAt);
+  const date = item.kind === "drug" ? formatExpiryDate(item.dueAt) : formatKoreanDate(item.dueAt);
   if (item.kind === "drug" && date !== "-") {
     const remaining = getRemainingDaysLabel(item);
     return remaining ?? `유효 ${date}`;
@@ -72,7 +77,7 @@ export function getDetailRows(item: DashboardItem): DetailRow[] {
       { label: "구분", value: item.category === "prescription" ? "전문약" : "일반약" },
       { label: "먼저", value: item.isPriority ? "예" : "아니오" },
       { label: "상태", value: getDrugStatusLabel(item) },
-      item.dueAt ? { label: "유효기간", value: formatKoreanDate(item.dueAt) } : undefined,
+      item.dueAt ? { label: "유효기간", value: formatExpiryDate(item.dueAt) } : undefined,
       location ? { label: "위치", value: location } : undefined,
       quantity ? { label: "수량", value: quantity } : undefined,
       { label: "담당", value: item.owner },
@@ -167,7 +172,7 @@ export function getDetailSections(item: DashboardItem): DetailSection[] {
   return [
     detailSection("유효기간", [
       remaining ? { label: "남은 일수", value: remaining } : undefined,
-      item.dueAt ? { label: "유효기간", value: formatKoreanDate(item.dueAt) } : undefined
+      item.dueAt ? { label: "유효기간", value: formatExpiryDate(item.dueAt) } : undefined
     ], "expiry"),
     detailSection("약품 정보", [
       { label: "상태", value: getDrugStatusLabel(item) },
@@ -192,7 +197,7 @@ export function getDrugListFacts(item: DashboardItem): DrugListFact[] {
     { label: "먼저", value: "먼저" },
     { label: "상태", value: getDrugStatusLabel(item) },
     remaining ? { label: "남은", value: remaining } : undefined,
-    item.dueAt ? { label: "유효", value: formatKoreanDate(item.dueAt) } : undefined,
+    item.dueAt ? { label: "유효", value: formatExpiryDate(item.dueAt) } : undefined,
     quantity ? { label: "수량", value: quantity } : undefined,
     location ? { label: "위치", value: location } : undefined
   ].filter((fact): fact is DrugListFact => Boolean(fact));

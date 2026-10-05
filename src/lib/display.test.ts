@@ -51,7 +51,7 @@ describe("dense row display helpers", () => {
       { label: "구분", value: "전문약" },
       { label: "먼저", value: "예" },
       { label: "상태", value: "긴급" },
-      { label: "유효기간", value: "2026년 11월 17일" },
+      { label: "유효기간", value: "26년11월17일" },
       { label: "위치", value: "C2" },
       { label: "수량", value: "1" },
       { label: "담당", value: "혜미" },
@@ -119,7 +119,7 @@ describe("dense row display helpers", () => {
       { label: "먼저", value: "먼저" },
       { label: "상태", value: "긴급" },
       { label: "남은", value: "65일 남음" },
-      { label: "유효", value: "2026년 9월 11일" },
+      { label: "유효", value: "26년9월11일" },
       { label: "수량", value: "40매" },
       { label: "위치", value: "앞매대" }
     ]);
@@ -206,7 +206,7 @@ describe("dense row display helpers", () => {
       tone: "expiry",
       rows: [
         { label: "남은 일수", value: "60일 남음" },
-        { label: "유효기간", value: "2026년 9월 6일" }
+        { label: "유효기간", value: "26년9월6일" }
       ]
     });
     expect(sections.flatMap((section) => section.rows).some((row) => row.value.includes("teams/"))).toBe(false);

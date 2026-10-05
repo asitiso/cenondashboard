@@ -12,7 +12,7 @@ describe("home drug dense display", () => {
       qty: "3"
     }, "Q1");
 
-    expect(getDenseRowMeta(item)).toContain("2026");
+    expect(getDenseRowMeta(item)).toBe("26년9월6일");
     expect(getDenseRowMeta(item)).not.toContain("K1");
     expect(getDenseRowTimeLabel(item)).toContain("60");
     vi.useRealTimers();
