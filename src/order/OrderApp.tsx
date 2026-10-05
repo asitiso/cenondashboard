@@ -7,7 +7,7 @@ import { SearchCard } from "./SearchCard";
 import { BarcodeCamera } from "./BarcodeCamera";
 import { SupplierManager, removeSupplierSettings } from "./SupplierManager";
 import { AddSupplier } from "./AddSupplier";
-import { registerProductSupplier, connectWholesaleSites, isWholesaleSite, confirmRestore } from "./additionalSuppliers";
+import { registerProductSupplier, connectWholesaleSites, isWholesaleSite, wholesaleTitles, confirmRestore } from "./additionalSuppliers";
 import { allOrderSites, connectionSites, copiedSupplierSite, saveOrderSite } from "./orderSites";
 import { editManualProduct, isManualProduct, isProductSite, saveRegisteredPrice, saveProductSupplierNote, renameRegisteredSupplier } from "./productSettings";
 import { formatPhone } from "./phone";
@@ -127,6 +127,8 @@ export default function OrderApp({ data, focusProduct }: { data: ReturnType<type
     [onlyProduct, setOnlyProduct] = useState(false),
     [chosenSite, setChosenSite] = useState(""),
     [siteQuery, setSiteQuery] = useState(""),
+    [wholesaleTarget, setWholesaleTarget] =
+      useState<NonNullable<SupplierSetting["wholesaleTarget"]>>("choose"),
     [busy, setBusy] = useState(false);
   const [newUsage, setNewUsage] = useState<Usage>("retail");
   const [supplierQuery, setSupplierQuery] = useState("");
@@ -287,6 +289,7 @@ export default function OrderApp({ data, focusProduct }: { data: ReturnType<type
         link = orderSites.find((b) => b.id === conf?.bookmarkId);
       setChosenSite(link?.id ?? "");
       setSiteQuery("");
+      setWholesaleTarget(conf?.wholesaleTarget ?? "choose");
       setAddress(link?.url ?? "");
       setPhone(conf?.phone ?? link?.phone ?? "");
       setMethod(
@@ -374,19 +377,44 @@ export default function OrderApp({ data, focusProduct }: { data: ReturnType<type
     const conf =
         prefs.productSuppliers?.[p.baseId + "|" + name] ??
         prefs.suppliers[name],
-      link =
+      initialLink =
         orderSites.find((b) => b.id === (siteId ?? conf?.bookmarkId)) ??
         orderSites.find((b) => b.title === name),
       mode =
         selectedMode ??
         conf?.methods?.[0] ??
-        link?.methods?.[0] ??
+        initialLink?.methods?.[0] ??
         conf?.method ??
         "사이트";
+    let resolvedSiteId = siteId;
+    if (mode === "사이트" && !resolvedSiteId) {
+      const wholesaleIds = (conf?.bookmarkIds ?? []).filter((id) =>
+        isWholesaleSite(orderSites.find((b) => b.id === id)?.title ?? ""),
+      );
+      if (wholesaleIds.length) {
+        const target = conf?.wholesaleTarget ?? "choose";
+        if (target === "choose") {
+          edit({ kind: "mallSites", p, supplier: name });
+          return;
+        }
+        resolvedSiteId = wholesaleIds.find(
+          (id) =>
+            normalizeName(orderSites.find((b) => b.id === id)?.title ?? "") ===
+            normalizeName(target),
+        );
+      }
+    }
+    const link =
+      orderSites.find((b) => b.id === (resolvedSiteId ?? conf?.bookmarkId)) ??
+      initialLink;
     if (mode === "사이트") {
       if (!link?.url) {
         edit({ kind: "supplier", p, supplier: name });
-        if (siteId && link) { setChosenSite(siteId); setAddress(link.url); setOnlyProduct(true); }
+        if (resolvedSiteId && link) {
+          setChosenSite(resolvedSiteId);
+          setAddress(link.url);
+          setOnlyProduct(true);
+        }
         return;
       }
       void copy(shortName(p, prefs));
@@ -470,8 +498,11 @@ export default function OrderApp({ data, focusProduct }: { data: ReturnType<type
     if (
       await run(() =>
         data.change((p) => {
+          const selectedSite = connectionSites(p).find((b) => b.id === chosenSite);
+          const selectedWholesale = isWholesaleSite(selectedSite?.title ?? "");
           const conf: SupplierSetting = {
             bookmarkId: chosenSite || stableId("supplier-site|" + name),
+            ...(selectedWholesale ? { wholesaleTarget } : {}),
             method:
               method === "문자" || method === "카카오톡"
                 ? "카카오톡·문자"
@@ -1206,9 +1237,9 @@ export default function OrderApp({ data, focusProduct }: { data: ReturnType<type
               close();
             })} />}
             {dialog.kind === "mallSites" && dialog.p && dialog.supplier && <div className="of-actions">
-              {((prefs.productSuppliers?.[dialog.p.baseId + "|" + dialog.supplier] ?? prefs.suppliers[dialog.supplier])?.bookmarkIds ?? []).map((id, i) => {
+              {((prefs.productSuppliers?.[dialog.p.baseId + "|" + dialog.supplier] ?? prefs.suppliers[dialog.supplier])?.bookmarkIds ?? []).map((id) => {
                 const b = orderSites.find(site => site.id === id);
-                return b ? <button key={id} onClick={() => order(dialog.p!, dialog.supplier!, "사이트", id)}>{b.title}{i === 0 ? " · 기본" : ""}{!b.url ? " · 주소 등록 필요" : " ↗"}</button> : null;
+                return b ? <button key={id} onClick={() => order(dialog.p!, dialog.supplier!, "사이트", id)}>{b.title === "theSHOP" ? "the Shop" : b.title}{!b.url ? " · 주소 등록 필요" : " ↗"}</button> : null;
               })}
             </div>}
             {dialog.kind === "mall" && dialog.p && (
@@ -1410,6 +1441,7 @@ export default function OrderApp({ data, focusProduct }: { data: ReturnType<type
                       const site = connectionSites(prefs).find((b) => b.id === e.target.value);
                       setAddress(site?.url ?? "");
                       setPhone(site?.phone ?? "");
+                      if (isWholesaleSite(site?.title ?? "")) setWholesaleTarget("choose");
                       if (dialog.p && isProductSite(dialog.supplier + " " + (site?.title ?? "") + " " + (site?.url ?? ""))) setOnlyProduct(true);
                     }}
                   >
@@ -1434,6 +1466,28 @@ export default function OrderApp({ data, focusProduct }: { data: ReturnType<type
                     onChange={(e) => setAddress(e.target.value)}
                   />
                 </label>
+                {isWholesaleSite(
+                  connectionSites(prefs).find((b) => b.id === chosenSite)?.title ?? "",
+                ) && (
+                  <label>
+                    종합도매 버튼 동작
+                    <select
+                      value={wholesaleTarget}
+                      onChange={(e) =>
+                        setWholesaleTarget(
+                          e.target.value as NonNullable<SupplierSetting["wholesaleTarget"]>,
+                        )
+                      }
+                    >
+                      <option value="choose">누를 때 3곳에서 선택</option>
+                      {wholesaleTitles.map((title) => (
+                        <option key={title} value={title}>
+                          {title === "theSHOP" ? "the Shop" : title}으로 바로 이동
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 {dialog.p && !supplierRows(dialog.p).some(r => r.supplier === dialog.supplier) && (
                   <>
                     <label>매입처 이름<input value={registeredSupplierName} onChange={e => setRegisteredSupplierName(e.target.value)} /></label>
