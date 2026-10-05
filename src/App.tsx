@@ -18,7 +18,7 @@ import {
   UserRound,
   X
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { useDashboardData } from "./hooks/useDashboardData";
 import type { ChangeCategory, DashboardItem, DrugCategory, ItemKind, ItemStatus } from "./types";
 import { buildHomeSections, type HomeDrugFilter } from "./lib/homeSections";
@@ -844,7 +844,13 @@ export default function App() {
   const [focusProduct, setFocusProduct] = useState<{ product: Product; token: number }>();
   const [visitedOperations, setVisitedOperations] = useState(false);
   const [visitedAnalysis, setVisitedAnalysis] = useState(false);
+  const scrollPositions = useRef({ order: 0, operations: 0, analysis: 0 });
+  useLayoutEffect(() => {
+    window.scrollTo({ top: scrollPositions.current[active], behavior: "instant" });
+  }, [active]);
   const navigate = (value: "order" | "operations" | "analysis") => {
+    if (value === active) return;
+    scrollPositions.current[active] = window.scrollY;
     if (value === "operations") setVisitedOperations(true);
     if (value === "analysis") setVisitedAnalysis(true);
     setActive(value);
@@ -857,8 +863,8 @@ export default function App() {
     <div hidden={active !== "order"}><OrderApp data={data} focusProduct={focusProduct} /></div>
     {visitedAnalysis && <div hidden={active !== "analysis"}><PurchaseAnalysis data={data} onInspect={product => {
       setFocusProduct(value => ({ product, token: (value?.token ?? 0) + 1 }));
-      setActive("order");
-      window.scrollTo({ top: 0, behavior: "instant" });
+      scrollPositions.current.order = 0;
+      navigate("order");
     }} /></div>}
     {visitedOperations && <div hidden={active !== "operations"}><OperationsDashboard /></div>}
   </>;
