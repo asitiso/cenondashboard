@@ -1653,7 +1653,7 @@ h2 {
     display: none;
   }
 
-  .dense-row > span:nth-last-child(-n + 2) {
+  .dense-row:not(.drug-row) > span:nth-last-child(-n + 2) {
     display: none;
   }
 
