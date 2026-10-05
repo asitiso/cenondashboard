@@ -1675,7 +1675,7 @@ h2 {
     text-align: left;
   }
 
-  .app-shell .drug-row {
+  .app-shell .dense-row.drug-row {
     min-height: 50px;
     grid-template-rows: minmax(18px, auto) minmax(17px, auto);
   }
