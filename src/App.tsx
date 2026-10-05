@@ -205,16 +205,45 @@ function CompactMetric({ label, value, tone }: { label: string; value: number; t
   );
 }
 
-function DenseItemRow({ item, onSelect }: { item: DashboardItem; onSelect: (item: DashboardItem) => void }) {
+function DenseItemRow({
+  item,
+  onSelect,
+  onTogglePriority
+}: {
+  item: DashboardItem;
+  onSelect: (item: DashboardItem) => void;
+  onTogglePriority?: (item: DashboardItem) => Promise<void>;
+}) {
   return (
-    <button className={`dense-row ${item.kind === "drug" ? "drug-row" : ""}`} onClick={() => onSelect(item)}>
+    <div
+      className={`dense-row ${item.kind === "drug" ? "drug-row" : ""}`}
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect(item)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") onSelect(item);
+      }}
+    >
       <span className={`urgency-dot ${item.urgency}`} />
       <strong>{item.title}</strong>
       {item.isPriority && <span className="priority-badge">먼저</span>}
       {shouldShowDenseStatusBadge(item) && <StatusBadge item={item} />}
       <span className="dense-meta">{getDenseRowMeta(item)}</span>
       <span className="dense-due">{getDenseRowTimeLabel(item)}</span>
-    </button>
+      {item.kind === "drug" && (
+        <button
+          className={`dense-priority-toggle ${item.isPriority ? "selected" : ""}`}
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            void onTogglePriority?.(item);
+          }}
+          aria-pressed={Boolean(item.isPriority)}
+        >
+          먼저
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -655,11 +684,13 @@ function GroupedWorkList({ groups, selected, onSelect }: { groups: ChangeCategor
 function HomeDashboard({
   items,
   onSelect,
-  onOpenSection
+  onOpenSection,
+  onTogglePriority
 }: {
   items: DashboardItem[];
   onSelect: (item: DashboardItem) => void;
   onOpenSection: (view: HomeSectionTargetView) => void;
+  onTogglePriority?: (item: DashboardItem) => Promise<void>;
 }) {
   const [drugFilter, setDrugFilter] = useState<HomeDrugFilter>(() => getSavedHomeDrugFilter());
   const summary = buildHomeSummary(items);
@@ -711,7 +742,14 @@ function HomeDashboard({
               {section.items.length === 0 ? (
                 <div className="compact-empty">현재 처리할 항목 없음</div>
               ) : (
-                section.items.map((item) => <DenseItemRow key={item.source.path} item={item} onSelect={onSelect} />)
+                section.items.map((item) => (
+                  <DenseItemRow
+                    key={item.source.path}
+                    item={item}
+                    onSelect={onSelect}
+                    onTogglePriority={section.key === "drugs" ? onTogglePriority : undefined}
+                  />
+                ))
               )}
             </div>
           </article>
@@ -1015,7 +1053,12 @@ function OperationsDashboard() {
           <LoginPanel onLogin={login} mockMode={mockMode} />
         ) : view === "home" ? (
           <>
-            <HomeDashboard items={items} onSelect={selectFromHome} onOpenSection={openHomeSection} />
+            <HomeDashboard
+              items={items}
+              onSelect={selectFromHome}
+              onOpenSection={openHomeSection}
+              onTogglePriority={toggleDrugPriority}
+            />
             <DetailOverlay
               item={overlayOpen ? selected : undefined}
               onClose={() => setOverlayOpen(false)}
