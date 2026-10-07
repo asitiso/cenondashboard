@@ -1918,3 +1918,5 @@ h2 {
   .app-shell .drug-fact-strip .drug-secondary { display: none; }
   .app-shell .drug-list-row .row-meta { display: none; }
 }
+.first-screen-button { border: 1px solid #aaa; background: #fff; color: #333; border-radius: 4px; padding: 7px 11px; cursor: pointer; font: inherit; font-size: 12px; }
+.first-screen-button[aria-pressed='true'] { color: #b52b25; border-color: #b52b25; background: #fff6f5; }

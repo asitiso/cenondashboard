@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -7,6 +7,7 @@ import {
   Home,
   LogOut,
   Menu,
+  StickyNote,
   Pill,
   Pencil,
   Plus,
@@ -36,6 +37,7 @@ import OrderApp, { TopNavigation } from "./order/OrderApp";
 import PurchaseAnalysis from "./order/PurchaseAnalysis";
 import { useOrderData } from "./order/useOrderData";
 import type { Product } from "./order/types";
+import { getFirstScreen, setFirstScreen, type FirstScreen } from "./lib/firstScreen";
 import {
   formatKoreanDate,
   formatManualDetailTextForDisplay,
@@ -50,7 +52,8 @@ import {
   shouldShowStatusBadge
 } from "./lib/display";
 
-type ViewKey = "home" | "changes" | "manual" | "drugs" | "search";
+const MemoApp = lazy(() => import("./memo/MemoApp"));
+type ViewKey = "home" | "changes" | "manual" | "drugs" | "memo" | "search";
 type DrugTab = "all" | DrugCategory;
 type DrugStatusFilter = "all" | DrugStatusLabel;
 type ChangeListMode = "latest" | "category";
@@ -75,6 +78,7 @@ const navItems = [
   { key: "changes" as const, label: "변경사항", icon: RefreshCw },
   { key: "drugs" as const, label: "유기관리", icon: Pill },
   { key: "manual" as const, label: "매뉴얼 개선", icon: FileSearch },
+  { key: "memo" as const, label: "메모", icon: StickyNote },
   { key: "search" as const, label: "통합 검색", icon: Search }
 ];
 
@@ -685,12 +689,14 @@ function HomeDashboard({
   items,
   onSelect,
   onOpenSection,
-  onTogglePriority
+  onTogglePriority,
+  firstScreenAction
 }: {
   items: DashboardItem[];
   onSelect: (item: DashboardItem) => void;
   onOpenSection: (view: HomeSectionTargetView) => void;
   onTogglePriority?: (item: DashboardItem) => Promise<void>;
+  firstScreenAction: React.ReactNode;
 }) {
   const [drugFilter, setDrugFilter] = useState<HomeDrugFilter>(() => getSavedHomeDrugFilter());
   const summary = buildHomeSummary(items);
@@ -702,6 +708,7 @@ function HomeDashboard({
         <div>
           <p className="eyebrow">PC 업무 화면</p>
           <h1>한 화면 처리 현황</h1>
+          {firstScreenAction}
         </div>
         <div className="metric-strip">
           <CompactMetric label="변경" value={summary.activeChanges} tone="blue" />
@@ -883,11 +890,14 @@ export default function App() {
   const [visitedOperations, setVisitedOperations] = useState(false);
   const [visitedAnalysis, setVisitedAnalysis] = useState(false);
   const scrollPositions = useRef({ order: 0, operations: 0, analysis: 0 });
+  const memoFreezeRef = useRef<(() => void) | null>(null);
+  const registerMemoFreeze = useCallback((freeze: (() => void) | null) => { memoFreezeRef.current = freeze; }, []);
   useLayoutEffect(() => {
     window.scrollTo({ top: scrollPositions.current[active], behavior: "instant" });
   }, [active]);
   const navigate = (value: "order" | "operations" | "analysis") => {
     if (value === active) return;
+    if (active === "operations") memoFreezeRef.current?.();
     scrollPositions.current[active] = window.scrollY;
     if (value === "operations") setVisitedOperations(true);
     if (value === "analysis") setVisitedAnalysis(true);
@@ -904,11 +914,11 @@ export default function App() {
       scrollPositions.current.order = 0;
       navigate("order");
     }} /></div>}
-    {visitedOperations && <div hidden={active !== "operations"}><OperationsDashboard /></div>}
+    {visitedOperations && <div hidden={active !== "operations"}><OperationsDashboard isActive={active === "operations"} registerMemoFreeze={registerMemoFreeze} freezeMemo={() => memoFreezeRef.current?.()} /></div>}
   </>;
 }
 
-function OperationsDashboard() {
+function OperationsDashboard({ isActive, registerMemoFreeze, freezeMemo }: { isActive: boolean; registerMemoFreeze: (freeze: (() => void) | null) => void; freezeMemo: () => void }) {
   const {
     items,
     user,
@@ -923,7 +933,9 @@ function OperationsDashboard() {
     updateManualImprove,
     deleteManualImprove
   } = useDashboardData();
-  const [view, setView] = useState<ViewKey>("home");
+  const [view, setView] = useState<ViewKey>(() => getFirstScreen());
+  const [preferredScreen, setPreferredScreen] = useState<FirstScreen>(() => getFirstScreen());
+  const [visitedMemo, setVisitedMemo] = useState(() => getFirstScreen() === "memo");
   const [selected, setSelected] = useState<DashboardItem | undefined>();
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(DEFAULT_SIDEBAR_COLLAPSED);
@@ -986,6 +998,8 @@ function OperationsDashboard() {
   }, []);
 
   function navigateView(nextView: ViewKey) {
+    if (view === "memo" && nextView !== "memo") freezeMemo();
+    if (nextView === "memo") setVisitedMemo(true);
     setView(nextView);
     setDetailPanelOffset(0);
     setMobileMenuOpen(false);
@@ -995,6 +1009,10 @@ function OperationsDashboard() {
     setSelected(undefined);
     setOverlayOpen(false);
     navigateView(nextView);
+  }
+
+  function firstScreenAction(screen: FirstScreen) {
+    return <button type="button" className="first-screen-button" aria-pressed={preferredScreen === screen} onClick={() => { setFirstScreen(screen); setPreferredScreen(screen); }}>{preferredScreen === screen ? "★ 첫 화면" : "☆ 이 화면을 첫 화면으로"}</button>;
   }
 
   return (
@@ -1019,7 +1037,7 @@ function OperationsDashboard() {
         </div>
         <nav>
           {navItems.map(({ key, label, icon: Icon }) => (
-            <button key={key} className={view === key ? "active" : ""} onClick={() => navigateView(key)}>
+            <button key={key} className={view === key ? "active" : ""} onClick={() => navigateView(key)} aria-label={label} title={label}>
               <Icon size={18} />
               <span className="nav-label">{label}</span>
             </button>
@@ -1058,6 +1076,7 @@ function OperationsDashboard() {
               onSelect={selectFromHome}
               onOpenSection={openHomeSection}
               onTogglePriority={toggleDrugPriority}
+              firstScreenAction={firstScreenAction("home")}
             />
             <DetailOverlay
               item={overlayOpen ? selected : undefined}
@@ -1068,7 +1087,7 @@ function OperationsDashboard() {
               onToggleDrugPriority={toggleDrugPriority}
             />
           </>
-        ) : (
+        ) : view === "memo" ? null : (
           <div className="content-grid">
             {view === "changes" && <ListView title="변경사항" eyebrow="현재 반영하거나 확인할 변경" items={viewItems.changes} selected={selected} onSelect={selectFromList} changeMode />}
             {view === "manual" && (
@@ -1105,6 +1124,7 @@ function OperationsDashboard() {
             />
           </div>
         )}
+        {visitedMemo && <div hidden={view !== "memo"}><Suspense fallback={<p>메모를 불러오는 중…</p>}><MemoApp active={isActive && view === "memo"} registerFreeze={registerMemoFreeze} firstScreenAction={firstScreenAction("memo")} /></Suspense></div>}
         {manualEditor && (
           <ManualEditorOverlay
             mode={manualEditor.mode}

@@ -1,0 +1,258 @@
+.memo-app{
+  padding:28px 32px 48px;
+  max-width:1500px;
+  margin:0 auto
+}
+.memo-header,.memo-header-actions,.memo-card-top,.memo-footer{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px
+}
+.memo-header{
+  margin-bottom:18px
+}
+.memo-header h1{
+  margin:0
+}
+.memo-header-actions{
+  flex-wrap:wrap;
+  justify-content:flex-end
+}
+.memo-search{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  border:1px solid #d6dbe3;
+  background:white;
+  border-radius:12px;
+  padding:9px 12px;
+  max-width:460px;
+  margin-bottom:18px
+}
+.memo-search input{
+  border:0;
+  outline:0;
+  width:100%;
+  font:inherit
+}
+.memo-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:16px;
+  max-width:1260px
+}
+.memo-card{
+  height:290px;
+  min-width:0;
+  border-radius:16px;
+  padding:14px;
+  display:flex;
+  flex-direction:column;
+  box-shadow:0 3px 14px #1e293b18;
+  border:1px solid #00000012
+}
+.memo-yellow{
+  background:#fff6ca
+}
+.memo-blue{
+  background:#dff0ff
+}
+.memo-green{
+  background:#e3f5dd
+}
+.memo-pink{
+  background:#ffe4ed
+}
+.memo-purple{
+  background:#eee7ff
+}
+.memo-gray{
+  background:#eef0f2
+}
+.memo-card-top{
+  margin-bottom:8px
+}
+.memo-card button{
+  border:0;
+  background:transparent;
+  cursor:pointer
+}
+.memo-card button:disabled{
+  cursor:default;
+  opacity:.5
+}
+.memo-card-top>button.selected{
+  color:#1d4ed8
+}
+.memo-colors{
+  display:flex;
+  gap:5px
+}
+.memo-swatch{
+  width:16px;
+  height:16px;
+  border-radius:50%;
+  border:1px solid #0002!important
+}
+.memo-swatch.yellow{
+  background:#f9dc68
+}
+.memo-swatch.blue{
+  background:#8ac5ee
+}
+.memo-swatch.green{
+  background:#9ed58e
+}
+.memo-swatch.pink{
+  background:#ed9fc0
+}
+.memo-swatch.purple{
+  background:#b9a2ed
+}
+.memo-swatch.gray{
+  background:#b8bec6
+}
+.memo-swatch.selected{
+  outline:2px solid #334155;
+  outline-offset:2px
+}
+.memo-card-scroll{
+  flex:1;
+  min-height:0;
+  overflow-y:auto;
+  display:flex;
+  flex-direction:column;
+  gap:7px
+}
+.memo-card-scroll input,.memo-card-scroll textarea{
+  font:inherit;
+  background:transparent;
+  border:0;
+  outline:0;
+  width:100%;
+  resize:none
+}
+.memo-card-scroll textarea{
+  min-height:80px;
+  flex:1
+}
+.memo-title{
+  font-weight:700!important
+}
+.memo-check-row{
+  display:flex;
+  align-items:center;
+  gap:6px
+}
+.memo-check-row input[type=checkbox]{
+  width:auto
+}
+.memo-check-row input[type=text],.memo-check-row input:not([type]){
+  flex:1;
+  min-width:0
+}
+.memo-add-check{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  align-self:flex-start
+}
+.memo-card-status{
+  font-size:11px;
+  color:#475569;
+  height:16px;
+  margin-top:4px
+}
+.memo-warning{
+  color:#9a3412;
+  background:#fff3df;
+  padding:10px 14px;
+  border-radius:9px
+}
+.memo-hint{
+  color:#64748b
+}
+.memo-more{
+  border:1px solid #cbd5e1;
+  background:white;
+  border-radius:9px;
+  padding:9px 17px;
+  cursor:pointer
+}
+.memo-footer{
+  justify-content:center;
+  margin-top:18px
+}
+@media(max-width:1150px){
+  .memo-grid{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  max-width:960px
+}
+
+}
+@media(max-width:850px){
+  .memo-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  max-width:640px
+}
+
+}
+@media(max-width:600px){
+  .memo-app{
+  padding:18px
+}
+.memo-grid{
+  grid-template-columns:minmax(0,1fr)
+}
+.memo-header{
+  align-items:flex-start;
+  flex-direction:column
+}
+.memo-card{
+  max-width:440px;
+  width:100%
+}
+
+}
+
+
+.memo-conflict-actions{
+  display:flex;
+  gap:7px;
+  flex-wrap:wrap
+}
+.memo-conflict-actions button{
+  font-size:11px;
+  text-decoration:underline;
+  color:#1d4ed8
+}
+.memo-conflict-dialog{
+  position:fixed;
+  z-index:1000;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  width:min(500px,calc(100vw - 24px));
+  max-height:80vh;
+  overflow:auto;
+  background:white;
+  border:1px solid #cbd5e1;
+  border-radius:12px;
+  padding:20px;
+  box-shadow:0 18px 60px #0f172a55
+}
+.memo-conflict-dialog pre{
+  white-space:pre-wrap;
+  word-break:break-word;
+  background:#f8fafc;
+  padding:12px;
+  max-height:50vh;
+  overflow:auto
+}
+.memo-conflict-dialog button{
+  padding:6px 10px;
+  margin-right:8px;
+  border:1px solid #cbd5e1;
+  border-radius:6px
+}
