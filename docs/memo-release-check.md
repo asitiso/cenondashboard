@@ -29,4 +29,6 @@ No repeatable order-search delay was detected locally. Keep the no-slowdown gate
 
 **Deployment is still blocked.** The live project lacks the `sticky_notes` composite index on `pinned` descending and `updatedAt` descending: the memo list listener returned `The query requires an index`, leaving saved notes invisible in the list. The search composite index in `firestore.indexes.json` must also be provisioned and verified. Firebase CLI credentials were unavailable in this workspace, so no cloud index was created. Verify both indexes are ready and repeat the full memo flow before deploying the app. A live multi-PC revision conflict has not been exercised.
 
+The project also accepted an unauthenticated REST delete of a test `sticky_notes` document. Before release, verify the intended staff access policy and enforce it in Firestore Security Rules; the public web config alone is not an access control. The existing dashboard currently bypasses its login panel, so enabling auth-only memo rules requires a deliberate product decision and an authenticated staff flow.
+
 The local unit suite and production build are separate required checks. The source includes revision conflict tests and a freeze test proving save and unsubscribe are deferred past the navigation event.
