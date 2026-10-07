@@ -46,3 +46,9 @@ No repeatable order-search delay was detected locally. All performance test memo
 The user confirmed that memo access is intended for anyone. No authentication requirement or Firestore Security Rules change was made. The project currently allows unauthenticated `sticky_notes` reads and writes; that behavior matches the confirmed access choice.
 
 The local unit suite and production build are separate required checks. The source includes revision conflict tests and a freeze test proving save and unsubscribe are deferred past the navigation event.
+
+## Current main integration before deployment
+
+The memo-only commits were applied to GitHub `main` at `d530ba0` in a separate release branch. The newer order and purchase-analysis code remains untouched. The integrated build passed TypeScript, 141 tests (one existing real-data test skipped), and the Vite production build. A live `sticky_notes` flow passed create, immediate navigation to order search, save, body search, checklist search, and deletion; the exact test title had no remaining server document.
+
+With both builds using the same Firebase configuration and cached 1,200-product order fixture, three paired runs of 25 searches gave a median of 8.0–8.6 ms for current `main`, 7.9–8.1 ms for memo unopened, and 7.3–7.5 ms after opening memo and returning. In five further paired runs with real memo saves pending, order-search medians were 7.5–14.8 ms on current `main`, 7.9–14.8 ms on memo unopened, and 6.9–15.2 ms with a save pending. The later runs slowed across all states on the test PC; there was no repeatable memo-specific delay. Keep the release gate tied to comparison on the target PCs, since these figures are local measurements.
