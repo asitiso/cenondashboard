@@ -14,6 +14,19 @@ On 2026-10-07, a production build was tested in headless Chrome with the same sy
 | Memo build, memo unopened | 7.2–8.6 ms | 10.1–11.1 ms |
 | Memo build, opened then returned | 7.0–7.2 ms | 8.5–10.1 ms |
 
-This synthetic comparison did not show a repeatable slowdown. The environment has no Firebase configuration, so an actual memo save in flight and multi-PC conflict could not be measured end to end. **Do not deploy on the strength of this result alone.** Before release, use the same production order snapshot and Chrome machine to repeat the searches while a real `sticky_notes` save is pending, including navigation immediately after an edit. If the new version is meaningfully slower, withhold deployment and fix MemoApp without changing order search.
+This synthetic comparison did not show a repeatable slowdown.
+
+The supplied Firebase configuration was then applied locally to project `todaysell-d4bbc`. With the same 1,200-product cached order snapshot, Chrome ran 25 searches in each of three runs. A test memo was edited and navigation to order search happened immediately while its real Firestore transaction was pending. A longer-lived session confirmed that a transaction eventually committed, and test documents were removed from `sticky_notes`.
+
+| State | Median, three runs | p95, three runs |
+| --- | ---: | ---: |
+| Previous order build | 6.5–7.1 ms | 8.5–9.9 ms |
+| Memo build, memo unopened | 6.4–6.9 ms | 8.9–10.1 ms |
+| Memo build, save pending after navigation | 6.1–6.3 ms | 8.0–8.5 ms |
+| Memo build, returned to memo then order | 5.9–6.4 ms | 7.3–8.8 ms |
+
+No repeatable order-search delay was detected locally. Keep the no-slowdown gate for deployment.
+
+**Deployment is still blocked.** The live project lacks the `sticky_notes` composite index on `pinned` descending and `updatedAt` descending: the memo list listener returned `The query requires an index`, leaving saved notes invisible in the list. The search composite index in `firestore.indexes.json` must also be provisioned and verified. Firebase CLI credentials were unavailable in this workspace, so no cloud index was created. Verify both indexes are ready and repeat the full memo flow before deploying the app. A live multi-PC revision conflict has not been exercised.
 
 The local unit suite and production build are separate required checks. The source includes revision conflict tests and a freeze test proving save and unsubscribe are deferred past the navigation event.
