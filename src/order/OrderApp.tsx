@@ -6,6 +6,7 @@ import { Favorites, FolderTree } from "./Favorites";
 import { SearchCard } from "./SearchCard";
 import { BarcodeCamera } from "./BarcodeCamera";
 import { SupplierManager, removeSupplierSettings } from "./SupplierManager";
+import { getSearchableSites, getSupplierDirectory, manualProductIdsForSupplier } from "./supplierDirectory";
 import { AddSupplier } from "./AddSupplier";
 import { registerProductSupplier, connectWholesaleSites, isWholesaleSite, wholesaleTitles, confirmRestore } from "./additionalSuppliers";
 import { allOrderSites, connectionSites, copiedSupplierSite, saveOrderSite } from "./orderSites";
@@ -143,7 +144,7 @@ export default function OrderApp({ data, focusProduct }: { data: ReturnType<type
         if (change?.deleted && isManualProduct(original)) continue;
         const p = { ...original,
           ...(change?.name && isManualProduct(original) ? { name: change.name } : {}),
-          ...(original.manualSupplier && prefs.manualSupplierNames?.[original.baseId] ? { manualSupplier: prefs.manualSupplierNames[original.baseId] } : {}),
+          ...(Object.prototype.hasOwnProperty.call(prefs.manualSupplierNames ?? {}, original.baseId) ? { manualSupplier: prefs.manualSupplierNames![original.baseId] } : {}),
         };
         grouped.set(p.baseId, [...(grouped.get(p.baseId) ?? []), p]);
       }
@@ -153,25 +154,9 @@ export default function OrderApp({ data, focusProduct }: { data: ReturnType<type
         )
         .filter((p): p is Product => !!p);
     }, [snapshot, usage, prefs.manualProductEdits, prefs.manualSupplierNames]);
-  const suppliers = useMemo(
-    () =>
-      [
-        ...new Set(
-          (snapshot?.products ?? []).flatMap((p) => [
-            ...supplierRows(p).map((r) => r.supplier),
-            ...p.frequency.map((x) => x.supplier),
-            ...(p.manualSupplier ? [p.manualSupplier] : []),
-          ]),
-        ),
-      ].sort((a, b) => a.localeCompare(b, "ko")),
-    [snapshot],
-  );
-  const managedSuppliers = [...new Set([
-    ...suppliers,
-    ...Object.keys(prefs.suppliers),
-    ...Object.values(prefs.manualSupplierNames ?? {}),
-    ...Object.values(prefs.additionalSuppliers ?? {}).flat(),
-  ])].sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
+  const supplierDirectory = useMemo(() => getSupplierDirectory(snapshot, prefs), [snapshot, prefs]);
+  const managedSuppliers = supplierDirectory.managed;
+  const searchableSites = useMemo(() => getSearchableSites(prefs, supplierDirectory.linked, supplierDirectory.activeIds), [prefs, supplierDirectory]);
   const namesForSite = (b?: Bookmark) => [
     ...new Set([
       ...(b?.supplierNames ?? []),
@@ -185,10 +170,10 @@ export default function OrderApp({ data, focusProduct }: { data: ReturnType<type
   ];
   const q = normalizeName(deferred),
     supplierCandidates =
-      !scope && q ? managedSuppliers.filter((n) => normalizeName(n).includes(q)) : [];
+      !scope && q ? managedSuppliers.filter((n) => supplierDirectory.linked.has(n) && normalizeName(n).includes(q)) : [];
   const siteCandidates =
     !scope && q
-      ? connectionSites(prefs).filter((b) => normalizeName(b.title + " " + b.memo).includes(q))
+      ? searchableSites.filter((b) => normalizeName(b.title + " " + b.memo).includes(q))
       : [];
   const exact = supplierCandidates.find((n) => normalizeName(n) === q);
   const context = scope?.names ?? (exact ? [exact] : []);
@@ -536,6 +521,7 @@ export default function OrderApp({ data, focusProduct }: { data: ReturnType<type
           }
           const next = {
             ...saveOrderSite(p, site),
+            hiddenSuppliers: (p.hiddenSuppliers ?? []).filter(n => n !== name),
             ...(productOnly && product
               ? {
                   productSuppliers: {
@@ -609,6 +595,9 @@ export default function OrderApp({ data, focusProduct }: { data: ReturnType<type
         });
         if (prefs.manualProductEdits?.[baseId]) {
           await data.change(value => editManualProduct(value, p, name));
+        }
+        if (p.manualSupplier && prefs.hiddenSuppliers?.includes(p.manualSupplier)) {
+          await data.change(value => ({ ...value, hiddenSuppliers: (value.hiddenSuppliers ?? []).filter(n => n !== p.manualSupplier) }));
         }
       })
     ) {
@@ -1001,9 +990,9 @@ export default function OrderApp({ data, focusProduct }: { data: ReturnType<type
                   {siteCandidates.map((b) => (
                     <div className="of-supplier-card" key={b.id}>
                       <SiteButton site={b} onOpen={openSite} onPin={pinSite} busy={busy} />
-                      {namesForSite(b).length > 0 && (
+                      {namesForSite(b).some(name => supplierDirectory.linked.has(name)) && (
                         <button
-                          onClick={() => selectScope(b.title, namesForSite(b))}
+                          onClick={() => selectScope(b.title, namesForSite(b).filter(name => supplierDirectory.linked.has(name)))}
                         >
                           연결 품목 보기
                         </button>
@@ -1049,7 +1038,7 @@ export default function OrderApp({ data, focusProduct }: { data: ReturnType<type
         <Favorites
           preferences={prefs}
           change={data.change}
-          suppliers={suppliers}
+          suppliers={managedSuppliers}
           notify={setNotice}
           onClose={close}
         />
@@ -1145,14 +1134,16 @@ export default function OrderApp({ data, focusProduct }: { data: ReturnType<type
         <Modal title="매입처·주문 정보 관리" onClose={close} initialScrollTop={supplierScroll.current} backToTop>
           {notice && <p role="status">{notice}</p>}
           <SupplierManager
-            names={managedSuppliers} prefs={prefs} query={supplierQuery}
+            names={managedSuppliers} purchased={supplierDirectory.purchased} prefs={prefs} query={supplierQuery}
             onQuery={setSupplierQuery} busy={busy}
             onEdit={(name, scrollTop) => { supplierScroll.current = scrollTop ?? 0; edit({ kind: "supplier", supplier: name, from: "suppliers" }); }}
-            onRemove={(name) => {
-              if (!window.confirm(`${name}의 주문 정보를 삭제할까요? 매입 이력과 즐겨찾기 사이트는 보존됩니다.`)) return;
+            onRemove={(name, temporary) => {
+              if (!window.confirm(temporary
+                ? `임시 매입처 ‘${name}’를 삭제할까요? 상품 연결과 주문 정보가 해제됩니다. 즐겨찾기 사이트는 보존됩니다.`
+                : `${name}의 주문 정보를 삭제할까요? 매입 이력과 즐겨찾기 사이트는 보존됩니다.`)) return;
               void run(async () => {
-                await data.change((p) => removeSupplierSettings(p, name));
-                setNotice("주문 정보를 해제했습니다. 필요하면 다시 등록할 수 있습니다.");
+                await data.change((p) => removeSupplierSettings(p, name, temporary, manualProductIdsForSupplier(snapshot, p, name)));
+                setNotice(temporary ? "임시 매입처를 삭제했습니다." : "주문 정보를 해제했습니다. 필요하면 다시 등록할 수 있습니다.");
               });
             }}
           />
@@ -1603,7 +1594,7 @@ export default function OrderApp({ data, focusProduct }: { data: ReturnType<type
                   />
                 </label>
                 <datalist id="of-suppliers">
-                  {suppliers.map((n) => (
+                  {managedSuppliers.map((n) => (
                     <option key={n}>{n}</option>
                   ))}
                 </datalist>

@@ -7,7 +7,7 @@ export const isWholesaleSite = (title: string) => wholesaleTitles.some(t => norm
 export function addProductSupplier(p: Preferences, id: string, name: string): Preferences {
   const clean = name.trim();
   if (!clean) throw Error("매입처 이름을 입력하세요.");
-  return { ...p, additionalSuppliers: { ...p.additionalSuppliers, [id]: [...new Set([...(p.additionalSuppliers?.[id] ?? []), clean])] } };
+  return { ...p, hiddenSuppliers: (p.hiddenSuppliers ?? []).filter(n => n !== clean), additionalSuppliers: { ...p.additionalSuppliers, [id]: [...new Set([...(p.additionalSuppliers?.[id] ?? []), clean])] } };
 }
 export function connectWholesaleSites(p: Preferences, name: string, productId?: string): Preferences {
   let next = p;

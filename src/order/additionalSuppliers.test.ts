@@ -9,6 +9,12 @@ it("adds an unrecorded supplier once without inventing a purchase", () => {
   expect(next.suppliers).toEqual({});
   expect(emptyPreferences.additionalSuppliers).toBeUndefined();
 });
+it("restores a deleted temporary supplier when added to a product again", () => {
+  const prefs = { ...emptyPreferences, hiddenSuppliers: ["새 매입처"] };
+  const next = addProductSupplier(prefs, "product", "새 매입처");
+  expect(next.hiddenSuppliers).toEqual([]);
+  expect(next.additionalSuppliers?.product).toEqual(["새 매입처"]);
+});
 it("connects all three wholesale sites, reusing addresses and defaulting to HMP", () => {
   const prefs = { ...emptyPreferences, bookmarks: [{ id: "shop", title: "theSHOP", url: "https://example.com", folderId: "f", category: "종합도매", memo: "" }] };
   const next = connectWholesaleSites(prefs, "거래처", "product");
